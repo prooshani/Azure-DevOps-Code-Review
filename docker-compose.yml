@@ -1,0 +1,8 @@
+version: "3.9"
+services:
+  ai-pr-reviewer:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data

@@ -1,0 +1,74 @@
+# Azure DevOps Code Review AI
+
+![Project Header](./public/github-header.svg)
+
+Enterprise-grade, context-aware AI reviewer for Azure DevOps pull requests. Tool reads PR diff, linked work items, related PR history, and repository coding practices, then produces actionable review findings in diff-style format.
+
+## Why This Project
+
+Teams need more than syntax checks. This platform enforces team conventions and architectural expectations using:
+
+- Live Azure DevOps context
+- Repository-wide style profile extraction
+- Multi-model review orchestration (cloud + local)
+- Deterministic finding schema for CI/CD and governance
+
+## Core Capabilities
+
+- PAT-based Azure DevOps access
+- Auto-discovery of accessible organizations/projects/repositories
+- Multi-selection of repositories for context extraction
+- PR review by PR number
+- Linked work item ingestion
+- Related PR awareness
+- Coding-style profile generation from local repositories
+- Model auto-discovery for OpenAI, Anthropic, Gemini, Ollama, LM Studio
+- Diff-style findings with rationale and better-code suggestion
+
+## Architecture
+
+- `src/app` - Next.js App Router UI and API endpoints
+- `src/lib/azure-devops.ts` - Azure discovery and PR context collector
+- `src/lib/style-profile.ts` - local codebase convention mining
+- `src/lib/llm.ts` - provider/model adapters
+- `src/lib/review-engine.ts` - review orchestration pipeline
+- `data/` - local settings/profile persistence
+
+## Quick Start
+
+```bash
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000`.
+
+## Docker
+
+```bash
+docker compose up --build
+```
+
+## Product Flow
+
+1. Enter Azure DevOps PAT
+2. Fetch accessible repositories
+3. Select one or many repositories for context
+4. Configure AI provider + model
+5. Analyze style profile
+6. Run review on PR number
+
+## Security Notes
+
+- PAT and provider tokens are persisted locally in `data/settings.json`
+- Recommended next step for production: encrypted secret storage (DPAPI/KMS/Vault)
+
+## Branding Assets
+
+- Logo: `public/logo.svg`
+- App icon: `src/app/icon.svg`
+- GitHub header: `public/github-header.svg`
+
+## License
+
+MIT
