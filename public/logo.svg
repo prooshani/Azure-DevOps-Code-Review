@@ -1,12 +1,19 @@
-<svg width="240" height="64" viewBox="0 0 240 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="260" height="56" viewBox="0 0 260 56" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="240" y2="64" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#0F766E"/>
-      <stop offset="1" stop-color="#1D4ED8"/>
+    <linearGradient id="lg-mark" x1="0" y1="0" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7C5CFF"/>
+      <stop offset="0.55" stop-color="#4F8BFF"/>
+      <stop offset="1" stop-color="#38BDF8"/>
+    </linearGradient>
+    <linearGradient id="lg-text" x1="80" y1="10" x2="80" y2="46" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#B6BDD0"/>
     </linearGradient>
   </defs>
-  <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#g)"/>
-  <path d="M18 33L28 43L46 22" stroke="white" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-  <text x="72" y="30" fill="#0F172A" font-size="22" font-family="Segoe UI, Arial" font-weight="700">Azure DevOps</text>
-  <text x="72" y="50" fill="#1E293B" font-size="20" font-family="Segoe UI, Arial" font-weight="600">Code Review AI</text>
+  <rect x="2" y="2" width="52" height="52" rx="14" fill="url(#lg-mark)"/>
+  <rect x="2" y="2" width="52" height="52" rx="14" fill="url(#lg-mark)" opacity="0.0"/>
+  <path d="M16 28L24 36L40 20" stroke="white" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="42" cy="14" r="4" fill="#FFFFFF" opacity="0.85"/>
+  <text x="68" y="26" font-family="Inter, Segoe UI, Arial" font-size="15" font-weight="700" fill="url(#lg-text)" letter-spacing="-0.2">ADO Review AI</text>
+  <text x="68" y="44" font-family="Inter, Segoe UI, Arial" font-size="11" font-weight="500" fill="#8990A3" letter-spacing="1.2">CONTEXT-AWARE REVIEWER</text>
 </svg>

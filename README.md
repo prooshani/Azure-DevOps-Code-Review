@@ -58,9 +58,31 @@ docker compose up --build
 5. Analyze style profile
 6. Run review on PR number
 
+## Azure DevOps PAT Permissions
+
+Use a PAT from same user account that can access target org/project/repos.  
+Minimum recommended scopes:
+
+- `Code (Read)`  
+Needed to list repositories, read pull requests, iterations, and changed files.
+
+- `Work Items (Read)`  
+Needed to read linked work items from PR and pull ticket context.
+
+- `Project and Team (Read)`  
+Needed to enumerate projects and repo discovery context.
+
+- `Member Entitlement Management / Profile (Read)`  
+Needed for account/profile discovery used by PAT-based organization lookup.
+
+Optional (only if you later enable writing review comments back to Azure DevOps):
+
+- `Code (Read & Write)`  
+Needed to create PR threads/comments from this app.
+
 ## Security Notes
 
-- PAT and provider tokens are persisted locally in `data/settings.json`
+- PAT and provider tokens are persisted locally in per-user settings under `data/settings/`
 - Recommended next step for production: encrypted secret storage (DPAPI/KMS/Vault)
 
 ## Branding Assets

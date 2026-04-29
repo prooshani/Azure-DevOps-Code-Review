@@ -1,9 +1,7 @@
-import path from "node:path";
 import { promises as fs } from "node:fs";
 import { z } from "zod";
 import type { ReviewSettings } from "./types";
-
-const SETTINGS_PATH = path.join(process.cwd(), "data", "settings.json");
+import { userSettingsPath } from "./user-store";
 
 const schema = z.object({
   azure: z.object({
@@ -33,22 +31,17 @@ const schema = z.object({
   styleProfilePath: z.string().optional(),
 });
 
-async function ensureDataDir() {
-  await fs.mkdir(path.dirname(SETTINGS_PATH), { recursive: true });
-}
-
-export async function loadSettings(): Promise<ReviewSettings | null> {
+export async function loadSettings(userId: string): Promise<ReviewSettings | null> {
   try {
-    const raw = await fs.readFile(SETTINGS_PATH, "utf8");
+    const raw = await fs.readFile(userSettingsPath(userId), "utf8");
     return schema.parse(JSON.parse(raw));
   } catch {
     return null;
   }
 }
 
-export async function saveSettings(settings: ReviewSettings): Promise<ReviewSettings> {
+export async function saveSettings(userId: string, settings: ReviewSettings): Promise<ReviewSettings> {
   const parsed = schema.parse(settings);
-  await ensureDataDir();
-  await fs.writeFile(SETTINGS_PATH, JSON.stringify(parsed, null, 2), "utf8");
+  await fs.writeFile(userSettingsPath(userId), JSON.stringify(parsed, null, 2), "utf8");
   return parsed;
 }

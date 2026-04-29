@@ -38,6 +38,8 @@ export type ReviewFinding = {
 };
 
 export type ReviewResult = {
+  id?: string;
+  createdAt?: string;
   summary: string;
   sources: {
     pullRequestId: number;
@@ -45,6 +47,14 @@ export type ReviewResult = {
     relatedPullRequestIds: number[];
   };
   findings: ReviewFinding[];
+};
+
+export type StoredUser = {
+  id: string;
+  name: string;
+  email: string;
+  passwordHash: string;
+  createdAt: string;
 };
 
 export type PullRequestContext = {
