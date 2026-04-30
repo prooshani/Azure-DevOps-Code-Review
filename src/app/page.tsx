@@ -387,12 +387,7 @@ export default function HomePage() {
           ))}
         </div>
       </div>
-      {page === "settings" ? (
-        <button className="btn btn-primary btn-sm" onClick={saveAll} disabled={Boolean(busy)}>
-          {busy ? <span className="spinner" /> : <IconCheck />}
-          Save settings
-        </button>
-      ) : null}
+      {null /* Save button lives at bottom of settings page only */}
     </>
   );
 
@@ -901,7 +896,6 @@ function ReviewsPage({
                 </button>
               </span>
             </div>
-            <span className="field-hint">PR must live in one of your selected repositories. Press Enter or click Run.</span>
           </div>
           <button
             className="btn btn-primary"
@@ -913,6 +907,7 @@ function ReviewsPage({
             {busy ? "Reviewing…" : "Run review"}
           </button>
         </div>
+        <span className="field-hint" style={{ marginTop: 4 }}>PR must live in one of your selected repositories. Press Enter or click Run.</span>
 
         {peekError ? (
           <div className="row" style={{ gap: 6, color: "var(--danger)", fontSize: 12.5 }}>
@@ -1331,28 +1326,27 @@ function AzureTab({
           </div>
         </div>
 
-        <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
-          <button className="btn btn-primary" onClick={onFetchRepos} disabled={Boolean(busy)}>
+        <div className="row" style={{ flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+          <button className="btn btn-primary btn-sm" onClick={onFetchRepos} disabled={Boolean(busy)}>
             {busy ? <span className="spinner" /> : <IconRefresh />}
             Fetch repositories
           </button>
           <a
-            className="btn btn-ghost btn-sm"
+            className="btn btn-secondary btn-sm"
             href="https://learn.microsoft.com/azure/devops/integrate/get-started/authentication/pats"
             target="_blank"
             rel="noreferrer"
           >
-            <IconBook /> Create PAT
-            <IconExternal width={12} height={12} />
+            <IconBook width={13} height={13} /> Create PAT
+            <IconExternal width={11} height={11} />
           </a>
-        </div>
-
-        <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
-          <span className="badge badge-info">
-            <IconShield width={11} height={11} /> Stored locally
-          </span>
-          <span className="badge">
-            {settings.azure.selectedRepositories.length} selected
+          <span style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            <span className="badge badge-info" style={{ fontSize: 11 }}>
+              <IconShield width={10} height={10} /> Stored locally
+            </span>
+            <span className="badge" style={{ fontSize: 11 }}>
+              {settings.azure.selectedRepositories.length} selected
+            </span>
           </span>
         </div>
       </article>

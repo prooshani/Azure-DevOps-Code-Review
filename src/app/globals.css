@@ -23,7 +23,7 @@
   --text-secondary:   #b8c4db;
   --text-muted:       #7e8fa8;
   --text-faint:       #4c5a72;
-  --text-placeholder: #445068;
+  --text-placeholder: #7a90b5;
 
   /* Brand */
   --brand-1: #7c5cff;
@@ -69,7 +69,7 @@
   --r-2xl: 24px;
   --r-pill: 999px;
   /* Brand card radius � TL/BR = 32px, TR/BL = 8px */
-  --r-card: 32px 8px 32px 8px;
+  --r-card: 24px 8px 24px 8px;
 
   /* Shadow */
   --shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.3);
@@ -180,7 +180,7 @@ code,
 }
 
 .input::placeholder,
-.textarea::placeholder { color: var(--text-placeholder); font-style: italic; }
+.textarea::placeholder { color: var(--text-placeholder); font-style: normal; font-weight: 400; }
 
 .input:hover,
 .select:hover,
@@ -230,7 +230,7 @@ code,
   padding: 18px;
   background: rgba(0, 0, 0, 0.20);
   border: 1px solid var(--border-soft);
-  border-radius: 32px 8px 32px 8px;
+  border-radius: 24px 8px 24px 8px;
 }
 .form-section + .form-section { margin-top: 12px; }
 
@@ -373,7 +373,7 @@ code,
 .card {
   background: var(--bg-elevated);
   border: 1px solid var(--border-soft);
-  border-radius: 32px 8px 32px 8px;
+  border-radius: 24px 8px 24px 8px;
   padding: 22px;
   position: relative;
   box-shadow: 0 2px 16px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.06);
@@ -387,7 +387,7 @@ code,
   right: 16px;
   height: 1px;
   background: rgba(255, 255, 255, 0.10);
-  border-radius: 32px 8px 0 0;
+  border-radius: 24px 8px 0 0;
   pointer-events: none;
 }
 .card-glow { box-shadow: var(--shadow-md), var(--shadow-glow); }
@@ -807,7 +807,7 @@ code,
   min-width: 240px;
   background: #1e3358;
   border: 1px solid var(--border-strong);
-  border-radius: 32px 8px 32px 8px;
+  border-radius: 24px 8px 24px 8px;
   padding: 14px;
   box-shadow: var(--shadow-lg);
   z-index: 50;
@@ -884,7 +884,7 @@ code,
   gap: 8px;
   background: var(--bg-elevated);
   border: 1.5px solid var(--border-soft);
-  border-radius: 32px 8px 32px 8px;
+  border-radius: 24px 8px 24px 8px;
   position: relative;
   overflow: hidden;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
@@ -938,7 +938,7 @@ code,
   gap: 14px;
   background: linear-gradient(135deg, rgba(124, 92, 255, 0.10), rgba(56, 189, 248, 0.06));
   border: 1px solid rgba(124, 92, 255, 0.22);
-  border-radius: 32px 8px 32px 8px;
+  border-radius: 24px 8px 24px 8px;
 }
 
 .wizard-progress { display: grid; gap: 8px; }
@@ -969,7 +969,7 @@ code,
   flex-direction: column;
   gap: 10px;
   padding: 16px;
-  border-radius: 32px 8px 32px 8px;
+  border-radius: 24px 8px 24px 8px;
   background: rgba(0, 0, 0, 0.30);
   border: 1.5px solid var(--border-soft);
   text-align: left;
@@ -1115,7 +1115,7 @@ code,
   align-items: center;
   gap: 12px;
   padding: 13px 16px;
-  border-radius: 32px 8px 32px 8px;
+  border-radius: 24px 8px 24px 8px;
   background: var(--bg-elevated);
   border: 1.5px solid var(--border-soft);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
@@ -1143,7 +1143,7 @@ code,
 
 /* Outer shell � mimics ADO file block */
 .finding {
-  border-radius: 32px 8px 32px 8px;
+  border-radius: 24px 8px 24px 8px;
   background: var(--bg-elevated);
   overflow: hidden;
   border: 1px solid var(--border-soft);
@@ -1518,7 +1518,7 @@ code,
 .pr-preview {
   margin-top: 16px;
   border: 1.5px solid rgba(124, 92, 255, 0.35);
-  border-radius: 32px 8px 32px 8px;
+  border-radius: 24px 8px 24px 8px;
   background: var(--bg-elevated);
   overflow: hidden;
   animation: pageIn 180ms ease both;
@@ -1654,7 +1654,7 @@ code,
 }
 
 /* =================== History list =================== */
-.history-list { display: grid; gap: 0; border: 1.5px solid var(--border-strong); border-radius: 32px 8px 32px 8px; overflow: hidden; }
+.history-list { display: grid; gap: 0; border: 1.5px solid var(--border-strong); border-radius: 24px 8px 24px 8px; overflow: hidden; }
 .history-item {
   display: grid;
   grid-template-columns: auto 1fr auto;
