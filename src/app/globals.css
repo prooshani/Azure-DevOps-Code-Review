@@ -1,14 +1,14 @@
 /* =============================================================
-   Azure DevOps Code Review AI — Design System v2
+   Azure DevOps Code Review AI ï¿½ Design System v2
    ============================================================= */
 
 :root {
-  /* Surface — blue-grey stepped palette, readable at every level */
+  /* Surface ï¿½ blue-grey stepped palette, readable at every level */
   --bg-base:    #0a1020;   /* page background */
   --bg-app:     #0d1526;   /* main content area */
   --bg-panel:   #131e34;   /* sidebar, topbar */
-  --bg-elevated:#1e3358;   /* cards — noticeably brighter for contrast */
-  --bg-input:   #2a4472;   /* inputs — clearly lighter than cards */
+  --bg-elevated:#1e3358;   /* cards ï¿½ noticeably brighter for contrast */
+  --bg-input:   #2a4472;   /* inputs ï¿½ clearly lighter than cards */
   --bg-hover:   rgba(255, 255, 255, 0.06);
   --bg-active:  rgba(255, 255, 255, 0.11);
 
@@ -33,7 +33,7 @@
   --brand-grad-soft: linear-gradient(135deg, rgba(124, 92, 255, 0.18), rgba(56, 189, 248, 0.12));
   --brand-glow: 0 0 0 1px rgba(124, 92, 255, 0.4), 0 8px 30px rgba(124, 92, 255, 0.25);
 
-  /* Semantic — vivid for instant recognition */
+  /* Semantic ï¿½ vivid for instant recognition */
   --success:        #22c55e;
   --success-bg:     rgba(34, 197, 94, 0.12);
   --success-border: rgba(34, 197, 94, 0.35);
@@ -68,7 +68,7 @@
   --r-xl:  18px;
   --r-2xl: 24px;
   --r-pill: 999px;
-  /* Brand card radius — TL/BR = 32px, TR/BL = 8px */
+  /* Brand card radius ï¿½ TL/BR = 32px, TR/BL = 8px */
   --r-card: 32px 8px 32px 8px;
 
   /* Shadow */
@@ -211,7 +211,7 @@ code,
 
 .select option { background: var(--bg-elevated); color: var(--text-primary); }
 
-/* Field group — a labeled form section with visual separation */
+/* Field group ï¿½ a labeled form section with visual separation */
 .field { display: grid; gap: 7px; }
 .field-label {
   font-size: 11.5px;
@@ -223,7 +223,7 @@ code,
 .field-hint { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
 .field-error { font-size: 12px; color: var(--danger); }
 
-/* Form section — groups several fields with a background panel */
+/* Form section ï¿½ groups several fields with a background panel */
 .form-section {
   display: grid;
   gap: 18px;
@@ -623,7 +623,7 @@ code,
 .app-shell {
   min-height: 100vh;
   display: grid;
-  /* Use explicit pixel value — var() in grid shorthand can fail on some engines */
+  /* Use explicit pixel value ï¿½ var() in grid shorthand can fail on some engines */
   grid-template-columns: 252px 1fr;
 }
 
@@ -749,7 +749,7 @@ code,
   box-shadow: 0 1px 0 rgba(124, 92, 255, 0.15), 0 4px 28px rgba(0, 0, 0, 0.4);
 }
 
-/* Page header section — sits right below topbar, above content */
+/* Page header section ï¿½ sits right below topbar, above content */
 .page-header {
   padding: 28px 32px 0;
   display: flex;
@@ -1138,10 +1138,10 @@ code,
 .provider-row-info small { font-size: 11.5px; color: var(--text-muted); }
 .provider-row-actions { display: flex; gap: 6px; }
 
-/* =================== Findings — Azure DevOps PR comment style =================== */
+/* =================== Findings ï¿½ Azure DevOps PR comment style =================== */
 .findings-list { display: grid; gap: 20px; }
 
-/* Outer shell — mimics ADO file block */
+/* Outer shell ï¿½ mimics ADO file block */
 .finding {
   border-radius: 32px 8px 32px 8px;
   background: var(--bg-elevated);
@@ -1153,7 +1153,7 @@ code,
 .finding.sev-warning { border-color: rgba(245, 158, 11, 0.4); }
 .finding.sev-info    { border-color: rgba(96, 165, 250, 0.35); }
 
-/* -- File header bar — like ADO file row --------------- */
+/* -- File header bar ï¿½ like ADO file row --------------- */
 .finding-file-bar {
   display: flex;
   align-items: center;
@@ -1206,7 +1206,7 @@ code,
 .finding.sev-warning .finding-sev-badge { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warning-border); }
 .finding.sev-info    .finding-sev-badge { background: var(--info-bg);    color: var(--info-text);    border: 1px solid var(--info-border); }
 
-/* -- Diff split panes — like ADO diff view -------------- */
+/* -- Diff split panes ï¿½ like ADO diff view -------------- */
 .finding-diff-split {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1241,7 +1241,7 @@ code,
 .finding-diff-pane.del .finding-diff-code { background: rgba(239,68,68,0.07); color: #fca5a5; }
 .finding-diff-pane.add .finding-diff-code { background: rgba(34,197,94,0.07);  color: #86efac; }
 
-/* -- PR comment thread — like ADO comment block --------- */
+/* -- PR comment thread ï¿½ like ADO comment block --------- */
 .finding-comment {
   background: rgba(0, 0, 0, 0.15);
   border-top: 1px solid var(--border-subtle);
@@ -1745,7 +1745,7 @@ code,
   animation: pageIn 200ms ease both;
 }
 @keyframes pageIn {
-  /* Start fully visible — only animate position so opacity issues can't hide content */
+  /* Start fully visible ï¿½ only animate position so opacity issues can't hide content */
   from { opacity: 1; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
