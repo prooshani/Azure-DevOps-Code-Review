@@ -1534,41 +1534,48 @@ function AiTab({
           </div>
         </div>
 
-        <div className="grid-2">
-          <button className="btn btn-secondary" onClick={onDetectModels} disabled={Boolean(busy)}>
-            {busy ? <span className="spinner" /> : <IconRefresh />}
-            Detect models
-          </button>
-          <button className="btn btn-secondary" onClick={onTestConnection} disabled={Boolean(busy)}>
-            <IconActivity />
-            Test connection
-          </button>
+        {/* Divider + action row */}
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border-subtle)" }}>
+          <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <button className="btn btn-secondary" onClick={onDetectModels} disabled={Boolean(busy)}>
+              {busy ? <span className="spinner" /> : <IconRefresh />}
+              Detect models
+            </button>
+            <button className="btn btn-secondary" onClick={onTestConnection} disabled={Boolean(busy)}>
+              <IconActivity />
+              Test connection
+            </button>
+          </div>
         </div>
 
-        <div className="field">
-          <label className="field-label" htmlFor="model">Model</label>
-          <select
-            id="model"
-            className="select"
-            value={candidate.model ?? ""}
-            onChange={(e) => setCandidate({ ...candidate, model: e.target.value })}
-          >
-            <option value="">— Select model —</option>
-            {models.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-          {models.length === 0 ? (
-            <span className="field-hint">Click &quot;Detect models&quot; after entering credentials.</span>
-          ) : null}
+        <div style={{ marginTop: 20 }}>
+          <div className="field">
+            <label className="field-label" htmlFor="model">Model</label>
+            <select
+              id="model"
+              className="select"
+              value={candidate.model ?? ""}
+              onChange={(e) => setCandidate({ ...candidate, model: e.target.value })}
+            >
+              <option value="">— Select model —</option>
+              {models.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+            {models.length === 0 ? (
+              <span className="field-hint">Click &quot;Detect models&quot; after entering credentials.</span>
+            ) : null}
+          </div>
         </div>
 
-        <button className="btn btn-primary" onClick={onSaveProvider} disabled={!candidate.model}>
-          <IconPlus />
-          Save provider
-        </button>
+        <div style={{ marginTop: 20 }}>
+          <button className="btn btn-primary" onClick={onSaveProvider} disabled={!candidate.model}>
+            <IconPlus />
+            Save provider
+          </button>
+        </div>
       </article>
 
       <article className="card">
@@ -1577,7 +1584,7 @@ function AiTab({
             <h2>Configured providers</h2>
             <span className="card-subtitle">Active model is the first one with a value set.</span>
           </div>
-          <span className="badge">{settings.providers.length} saved</span>
+          <span className="badge">{settings.providers.length} SAVED</span>
         </div>
 
         {settings.providers.length === 0 ? (
@@ -1638,7 +1645,7 @@ function AiTab({
           </div>
         )}
 
-        <div className="row" style={{ flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+        <div className="row" style={{ flexWrap: "wrap", gap: 6, marginTop: 12, paddingTop: 12, borderTop: "1px solid var(--border-subtle)" }}>
           <span className="badge badge-info"><IconCloud width={11} height={11} /> OpenAI</span>
           <span className="badge badge-info"><IconCloud width={11} height={11} /> Anthropic</span>
           <span className="badge badge-info"><IconCloud width={11} height={11} /> Gemini</span>
