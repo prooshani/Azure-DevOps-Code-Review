@@ -4,11 +4,11 @@
 
 :root {
   /* Surface — blue-grey stepped palette, readable at every level */
-  --bg-base:    #0b1120;   /* page background */
-  --bg-app:     #0e1628;   /* main content area */
-  --bg-panel:   #141f36;   /* sidebar, topbar */
-  --bg-elevated:#1c2d4a;   /* cards */
-  --bg-input:   #253a60;   /* inputs — clearly lighter than cards */
+  --bg-base:    #0c1322;   /* page background */
+  --bg-app:     #0f1829;   /* main content area */
+  --bg-panel:   #16223a;   /* sidebar, topbar */
+  --bg-elevated:#2a3f62;   /* cards — noticeably brighter for contrast */
+  --bg-input:   #2e4978;   /* inputs — clearly lighter than cards */
   --bg-hover:   rgba(255, 255, 255, 0.06);
   --bg-active:  rgba(255, 255, 255, 0.11);
 
@@ -68,6 +68,8 @@
   --r-xl:  18px;
   --r-2xl: 24px;
   --r-pill: 999px;
+  /* Brand card radius — TL/BR = 32px, TR/BL = 8px */
+  --r-card: 32px 8px 32px 8px;
 
   /* Shadow */
   --shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.3);
@@ -226,9 +228,9 @@ code,
   display: grid;
   gap: 18px;
   padding: 18px;
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--r-lg);
+  background: rgba(0, 0, 0, 0.20);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-card);
 }
 .form-section + .form-section { margin-top: 12px; }
 
@@ -371,10 +373,10 @@ code,
 .card {
   background: var(--bg-elevated);
   border: 1px solid var(--border-soft);
-  border-radius: var(--r-xl);
+  border-radius: var(--r-card);
   padding: 22px;
   position: relative;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
 /* Subtle top highlight line to make card feel "raised" */
 .card::after {
@@ -384,8 +386,8 @@ code,
   left: 16px;
   right: 16px;
   height: 1px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  background: rgba(255, 255, 255, 0.10);
+  border-radius: 32px 8px 0 0;
   pointer-events: none;
 }
 .card-glow { box-shadow: var(--shadow-md), var(--shadow-glow); }
@@ -803,9 +805,9 @@ code,
   top: calc(100% + 10px);
   right: 0;
   min-width: 240px;
-  background: #1a2844;
+  background: #2a3f62;
   border: 1px solid var(--border-strong);
-  border-radius: var(--r-lg);
+  border-radius: var(--r-card);
   padding: 14px;
   box-shadow: var(--shadow-lg);
   z-index: 50;
@@ -882,10 +884,10 @@ code,
   gap: 8px;
   background: var(--bg-elevated);
   border: 1.5px solid var(--border-soft);
-  border-radius: var(--r-xl);
+  border-radius: var(--r-card);
   position: relative;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
   transition: border-color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
 }
 .metric-card::before {
@@ -936,6 +938,7 @@ code,
   gap: 14px;
   background: linear-gradient(135deg, rgba(124, 92, 255, 0.10), rgba(56, 189, 248, 0.06));
   border: 1px solid rgba(124, 92, 255, 0.22);
+  border-radius: var(--r-card);
 }
 
 .wizard-progress { display: grid; gap: 8px; }
@@ -966,8 +969,8 @@ code,
   flex-direction: column;
   gap: 10px;
   padding: 16px;
-  border-radius: var(--r-lg);
-  background: rgba(11, 15, 26, 0.7);
+  border-radius: var(--r-card);
+  background: rgba(0, 0, 0, 0.30);
   border: 1.5px solid var(--border-soft);
   text-align: left;
   cursor: pointer;
@@ -1112,7 +1115,7 @@ code,
   align-items: center;
   gap: 12px;
   padding: 13px 16px;
-  border-radius: var(--r-lg);
+  border-radius: var(--r-card);
   background: var(--bg-elevated);
   border: 1.5px solid var(--border-soft);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
@@ -1135,81 +1138,56 @@ code,
 .provider-row-info small { font-size: 11.5px; color: var(--text-muted); }
 .provider-row-actions { display: flex; gap: 6px; }
 
-/* =================== Findings — severity-coded diff view =================== */
-.findings-list { display: grid; gap: 16px; }
+/* =================== Findings — Azure DevOps PR comment style =================== */
+.findings-list { display: grid; gap: 20px; }
 
-/* Severity accent on the left border */
+/* Outer shell — mimics ADO file block */
 .finding {
-  border-radius: var(--r-xl);
+  border-radius: var(--r-card);
   background: var(--bg-elevated);
   overflow: hidden;
   border: 1px solid var(--border-soft);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-  position: relative;
+  box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
 }
-.finding::before {
-  content: "";
-  position: absolute;
-  left: 0; top: 0; bottom: 0;
-  width: 4px;
-  border-radius: var(--r-xl) 0 0 var(--r-xl);
-}
-.finding.sev-error   { border-color: rgba(239, 68, 68, 0.35); background: linear-gradient(135deg, rgba(239,68,68,0.06) 0%, var(--bg-elevated) 35%); }
-.finding.sev-error::before   { background: var(--danger); box-shadow: 0 0 12px rgba(239,68,68,0.5); }
-.finding.sev-warning { border-color: rgba(245,158,11, 0.35); background: linear-gradient(135deg, rgba(245,158,11,0.06) 0%, var(--bg-elevated) 35%); }
-.finding.sev-warning::before { background: var(--warning); box-shadow: 0 0 12px rgba(245,158,11,0.5); }
-.finding.sev-info    { border-color: rgba(96,165,250, 0.30); background: linear-gradient(135deg, rgba(96,165,250,0.05) 0%, var(--bg-elevated) 35%); }
-.finding.sev-info::before    { background: var(--info); box-shadow: 0 0 12px rgba(96,165,250,0.4); }
+.finding.sev-error   { border-color: rgba(239, 68, 68, 0.4); }
+.finding.sev-warning { border-color: rgba(245, 158, 11, 0.4); }
+.finding.sev-info    { border-color: rgba(96, 165, 250, 0.35); }
 
-/* Header row */
-.finding-head {
+/* ── File header bar — like ADO file row ─────────────── */
+.finding-file-bar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
-  padding: 13px 16px 13px 20px;
+  padding: 10px 16px;
+  background: rgba(0, 0, 0, 0.30);
   border-bottom: 1px solid var(--border-subtle);
-  background: rgba(0, 0, 0, 0.18);
   flex-wrap: wrap;
 }
-.finding-sev-icon {
-  width: 30px; height: 30px;
-  border-radius: var(--r-md);
-  display: grid; place-items: center;
-  flex-shrink: 0;
-}
-.finding.sev-error   .finding-sev-icon { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }
-.finding.sev-warning .finding-sev-icon { background: var(--warning-bg); color: var(--warning); border: 1px solid var(--warning-border); }
-.finding.sev-info    .finding-sev-icon { background: var(--info-bg); color: var(--info); border: 1px solid var(--info-border); }
-
-.finding-head-meta { flex: 1; min-width: 0; }
-.finding-title {
-  font-size: 14px;
-  font-weight: 650;
-  color: var(--text-primary);
-  margin: 0 0 4px;
-  line-height: 1.3;
-}
-.finding-file-row {
+.finding-file-bar-left {
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
+  gap: 7px;
+  min-width: 0;
+  flex: 1;
 }
-.finding-file {
+.finding-file-bar-icon { color: var(--text-faint); flex-shrink: 0; }
+.finding-file-path {
   font-family: var(--font-mono), monospace;
-  font-size: 11.5px;
-  color: var(--text-muted);
-  background: rgba(0,0,0,0.25);
-  padding: 2px 7px;
-  border-radius: var(--r-sm);
-  border: 1px solid var(--border-subtle);
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 .finding-line {
   font-family: var(--font-mono), monospace;
   font-size: 11px;
   font-weight: 700;
-  padding: 2px 6px;
+  padding: 1px 6px;
   border-radius: var(--r-sm);
+  flex-shrink: 0;
 }
 .finding.sev-error   .finding-line { background: var(--danger-bg); color: var(--danger-text); border: 1px solid var(--danger-border); }
 .finding.sev-warning .finding-line { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warning-border); }
@@ -1218,7 +1196,7 @@ code,
 .finding-sev-badge {
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   padding: 3px 10px;
   border-radius: var(--r-pill);
@@ -1228,52 +1206,107 @@ code,
 .finding.sev-warning .finding-sev-badge { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warning-border); }
 .finding.sev-info    .finding-sev-badge { background: var(--info-bg);    color: var(--info-text);    border: 1px solid var(--info-border); }
 
-/* Body */
-.finding-body { padding: 0; }
-
-/* Side-by-side diff panes */
+/* ── Diff split panes — like ADO diff view ────────────── */
 .finding-diff-split {
   display: grid;
   grid-template-columns: 1fr 1fr;
   border-bottom: 1px solid var(--border-subtle);
+  background: rgba(0, 0, 0, 0.20);
 }
-.finding-diff-pane {
-  padding: 0;
-  overflow: hidden;
-}
+.finding-diff-pane { padding: 0; overflow: hidden; }
 .finding-diff-pane + .finding-diff-pane { border-left: 1px solid var(--border-subtle); }
 .finding-diff-pane-label {
-  padding: 6px 12px;
+  padding: 5px 12px;
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
-.finding-diff-pane.del .finding-diff-pane-label { background: rgba(239,68,68,0.1); color: var(--danger-text); }
-.finding-diff-pane.add .finding-diff-pane-label { background: rgba(34,197,94,0.1); color: var(--success-text); }
+.finding-diff-pane.del .finding-diff-pane-label { background: rgba(239,68,68,0.12); color: var(--danger-text); }
+.finding-diff-pane.add .finding-diff-pane-label { background: rgba(34,197,94,0.10); color: var(--success-text); }
 .finding-diff-code {
   font-family: var(--font-mono), "JetBrains Mono", "Fira Code", monospace;
   font-size: 12px;
-  line-height: 1.65;
+  line-height: 1.7;
   padding: 10px 14px;
   white-space: pre-wrap;
   word-break: break-word;
-  min-height: 60px;
+  min-height: 56px;
+  margin: 0;
 }
-.finding-diff-pane.del .finding-diff-code { background: rgba(239,68,68,0.06); color: var(--danger-text); }
-.finding-diff-pane.add .finding-diff-code { background: rgba(34,197,94,0.06);  color: var(--success-text); }
+.finding-diff-pane.del .finding-diff-code { background: rgba(239,68,68,0.07); color: #fca5a5; }
+.finding-diff-pane.add .finding-diff-code { background: rgba(34,197,94,0.07);  color: #86efac; }
 
-/* Why + suggestion below */
-.finding-footer { padding: 14px 20px; display: grid; gap: 10px; }
-.finding-why { font-size: 13.5px; color: var(--text-secondary); line-height: 1.65; }
+/* ── PR comment thread — like ADO comment block ───────── */
+.finding-comment {
+  background: rgba(0, 0, 0, 0.15);
+  border-top: 1px solid var(--border-subtle);
+  padding: 14px 16px;
+  display: grid;
+  gap: 0;
+}
+.finding-comment-thread {
+  border: 1px solid var(--border-soft);
+  border-radius: 0 var(--r-lg) var(--r-lg) var(--r-lg);
+  background: var(--bg-elevated);
+  overflow: hidden;
+}
+.finding-comment-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: rgba(0,0,0,0.18);
+  flex-wrap: wrap;
+}
+.finding-comment-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--brand-grad);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.finding-comment-author {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.finding-comment-title {
+  flex: 1;
+  font-size: 13.5px;
+  font-weight: 650;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+.finding-comment-body {
+  padding: 12px 14px;
+  display: grid;
+  gap: 10px;
+}
+.finding-why {
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  line-height: 1.65;
+  margin: 0;
+}
 .finding-suggestion {
   display: flex;
   gap: 10px;
-  padding: 12px 14px;
+  padding: 11px 13px;
   border-radius: var(--r-md);
-  background: rgba(124, 92, 255, 0.08);
-  border: 1px solid rgba(124, 92, 255, 0.25);
+  background: rgba(79, 139, 255, 0.08);
+  border: 1px solid rgba(79, 139, 255, 0.25);
+  border-left: 3px solid var(--brand-2);
   font-size: 13px;
   color: var(--text-secondary);
   line-height: 1.55;
@@ -1485,7 +1518,7 @@ code,
 .pr-preview {
   margin-top: 16px;
   border: 1.5px solid rgba(124, 92, 255, 0.35);
-  border-radius: var(--r-xl);
+  border-radius: var(--r-card);
   background: var(--bg-elevated);
   overflow: hidden;
   animation: pageIn 180ms ease both;
@@ -1621,7 +1654,7 @@ code,
 }
 
 /* =================== History list =================== */
-.history-list { display: grid; gap: 0; border: 1.5px solid var(--border-strong); border-radius: var(--r-lg); overflow: hidden; }
+.history-list { display: grid; gap: 0; border: 1.5px solid var(--border-strong); border-radius: var(--r-card); overflow: hidden; }
 .history-item {
   display: grid;
   grid-template-columns: auto 1fr auto;

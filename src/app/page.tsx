@@ -936,11 +936,8 @@ function ReviewsPage({
           </div>
 
           <div className="row" style={{ flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
-            {errorCount > 0 ? <span className="badge badge-danger">{errorCount} errors</span> : null}
-            {warnCount > 0 ? <span className="badge badge-warning">{warnCount} warnings</span> : null}
-            {infoCount > 0 ? <span className="badge badge-info">{infoCount} info</span> : null}
-            <span className="badge">Linked items: {review.sources.linkedWorkItemIds.length}</span>
-            <span className="badge">Related PRs: {review.sources.relatedPullRequestIds.length}</span>
+            <span className="badge">{review.sources.linkedWorkItemIds.length > 0 ? `${review.sources.linkedWorkItemIds.length} linked work item${review.sources.linkedWorkItemIds.length !== 1 ? "s" : ""}` : "No linked items"}</span>
+            <span className="badge">{review.sources.relatedPullRequestIds.length > 0 ? `${review.sources.relatedPullRequestIds.length} related PR${review.sources.relatedPullRequestIds.length !== 1 ? "s" : ""}` : "No related PRs"}</span>
             {review.createdAt ? (
               <span className="badge">{new Date(review.createdAt).toLocaleString()}</span>
             ) : null}
