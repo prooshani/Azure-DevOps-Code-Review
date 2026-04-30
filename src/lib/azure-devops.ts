@@ -135,6 +135,31 @@ export async function fetchPullRequestContext(settings: ReviewSettings, pullRequ
   const last = iterations.at(-1);
   const changes = last ? await gitApi.getPullRequestIterationChanges(repoId, pullRequestId, last.id!, project) : undefined;
 
+  // Fetch full diff content for each changed file
+  const changedFilesWithDiffs = changes?.changeEntries
+    ? await Promise.all(
+        changes.changeEntries.map(async (c) => {
+          const filePath = c.item?.path ?? "";
+          let patch = "";
+          try {
+            // Fetch diff using REST API directly
+            const diffUrl = `${picked.organizationUrl.replace(/\/$/, "")}/${encodeURIComponent(project)}/_apis/git/repositories/${encodeURIComponent(repoId)}/pullRequests/${pullRequestId}/diffs?api-version=7.1`;
+            const diffRes = await fetch(diffUrl, { headers: authHeader(pat) });
+            if (diffRes.ok) {
+              const diffData = await diffRes.json();
+              const fileDiff = diffData.value?.find((d: { path: string }) => d.path === filePath);
+              if (fileDiff?.patch) {
+                patch = fileDiff.patch;
+              }
+            }
+          } catch {
+            // If diff fetch fails, continue without patch
+          }
+          return { path: filePath, patch };
+        }),
+      )
+    : [];
+
   const linkedWorkRefs = await gitApi.getPullRequestWorkItemRefs(repoId, pullRequestId, project);
   const linkedIds = linkedWorkRefs.map((x) => Number(x.id)).filter((x) => Number.isFinite(x));
   const workItems = linkedIds.length ? await witApi.getWorkItems(linkedIds) : [];
@@ -173,10 +198,7 @@ export async function fetchPullRequestContext(settings: ReviewSettings, pullRequ
       state: String(w.fields?.["System.State"] ?? ""),
       description: String(w.fields?.["System.Description"] ?? ""),
     })),
-    changedFiles:
-      changes?.changeEntries?.map((c) => ({
-        path: c.item?.path ?? "",
-      })) ?? [],
+    changedFiles: changedFilesWithDiffs,
     relatedPullRequests: [...new Set(relatedPullRequests.flat())].map((id) => ({
       id,
       title: `PR ${id}`,

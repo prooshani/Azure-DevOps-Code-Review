@@ -3,6 +3,42 @@
 import { IconAlert, IconBolt, IconCode, IconInfo } from "./icons";
 import type { ReviewFinding } from "@/lib/types";
 
+/**
+ * Formats code text with line numbers.
+ * Uses the provided startLine to show actual file line numbers.
+ */
+function CodeWithLineNumbers({ code, startLine }: { code: string; startLine: number }) {
+  const lines = code.split("\n");
+
+  return (
+    <pre className="finding-diff-code">
+      {lines.map((line, idx) => {
+        // Detect diff line type
+        let lineType: "neutral" | "add" | "del" | "context" = "context";
+        let displayLine = line;
+
+        if (line.startsWith("+")) {
+          lineType = "add";
+          displayLine = line.slice(1);
+        } else if (line.startsWith("-")) {
+          lineType = "del";
+          displayLine = line.slice(1);
+        } else if (line.startsWith(" ") && line.length > 1) {
+          lineType = "context";
+          displayLine = line.slice(1);
+        }
+
+        return (
+          <div key={idx} className={`finding-diff-line finding-diff-line-${lineType}`}>
+            <span className="finding-diff-line-num">{startLine + idx}</span>
+            <span className="finding-diff-line-content">{displayLine || "\u00A0"}</span>
+          </div>
+        );
+      })}
+    </pre>
+  );
+}
+
 export function FindingCard({ finding }: { finding: ReviewFinding }) {
   const sev = finding.severity ?? "info";
   const sevClass = `sev-${sev}`;
@@ -46,13 +82,13 @@ export function FindingCard({ finding }: { finding: ReviewFinding }) {
             <div className="finding-diff-pane-label">
               <span>─</span> Before (current)
             </div>
-            <pre className="finding-diff-code">{finding.before || "(no snippet)"}</pre>
+            <CodeWithLineNumbers code={finding.before || "(no snippet)"} startLine={finding.lineStart} />
           </div>
           <div className="finding-diff-pane add">
             <div className="finding-diff-pane-label">
               <span>+</span> Suggested fix
             </div>
-            <pre className="finding-diff-code">{finding.after || "(no suggestion)"}</pre>
+            <CodeWithLineNumbers code={finding.after || "(no suggestion)"} startLine={finding.lineStart} />
           </div>
         </div>
       ) : null}

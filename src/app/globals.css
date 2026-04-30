@@ -647,7 +647,7 @@ code,
   display: flex;
   align-items: center;
   gap: 11px;
-  padding: 6px 6px 16px;
+  padding: 6px 6px 2px;
   border-bottom: 1px solid var(--border-soft);
 }
 .sidebar-brand-text strong { display: block; font-size: 13.5px; font-weight: 700; letter-spacing: -0.01em; }
@@ -1240,6 +1240,44 @@ code,
 }
 .finding-diff-pane.del .finding-diff-code { background: rgba(239,68,68,0.07); color: #fca5a5; }
 .finding-diff-pane.add .finding-diff-code { background: rgba(34,197,94,0.07);  color: #86efac; }
+
+/* -- Diff line numbers and colored lines ---------------- */
+.finding-diff-line {
+  display: flex;
+  align-items: center;
+  padding: 0 0;
+  min-height: 20.4px; /* line-height: 1.7 * 12px */
+  transition: background var(--t-fast);
+}
+.finding-diff-line:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+.finding-diff-line-num {
+  display: inline-block;
+  width: 40px;
+  text-align: right;
+  padding-right: 12px;
+  margin-right: 12px;
+  color: var(--text-faint);
+  font-size: 11px;
+  user-select: none;
+  border-right: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+.finding-diff-line-content {
+  flex: 1;
+  min-width: 0;
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Line type coloring */
+.finding-diff-line-add { background: rgba(34, 197, 94, 0.08); }
+.finding-diff-line-add .finding-diff-line-content { color: #86efac; }
+.finding-diff-line-del { background: rgba(239, 68, 68, 0.08); }
+.finding-diff-line-del .finding-diff-line-content { color: #fca5a5; }
+.finding-diff-line-context .finding-diff-line-content { color: var(--text-secondary); }
+.finding-diff-line-neutral .finding-diff-line-content { color: var(--text-secondary); }
 
 /* -- PR comment thread � like ADO comment block --------- */
 .finding-comment {

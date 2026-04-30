@@ -30,6 +30,17 @@ export async function runReview(userId: string, pullRequestId: number): Promise<
     : "  (none)";
   const files = pr.changedFiles.map((f) => `  ${f.path}`).join("\n") || "  (unknown)";
 
+  // Build diff content for each changed file (only files with actual diffs)
+  const filesWithDiffs = pr.changedFiles.filter((f) => f.patch && f.patch.length > 0);
+  const diffSections = filesWithDiffs
+    .map(
+      (f) => `
+=== DIFF: ${f.path} ===
+${f.patch}
+=== END DIFF: ${f.path} ===`,
+    )
+    .join("\n");
+
   const prompt = [
     `PR #${pr.pullRequestId}: "${pr.title}"`,
     `Branch: ${pr.sourceBranch ?? "?"} → ${pr.targetBranch ?? "?"}`,
@@ -47,9 +58,24 @@ export async function runReview(userId: string, pullRequestId: number): Promise<
     `${files}`,
     "=== END OF CHANGED FILES ===",
     "",
+    diffSections
+      ? `=== ACTUAL CODE DIFFS (USE THIS TO VERIFY FINDINGS) ===\n${diffSections}\n=== END ACTUAL CODE DIFFS ===`
+      : "NOTE: No diff content available. Review based on file paths only.",
+    "",
     `Project style rules:\n${styleRules}`,
     "",
-    "Review only the changed files listed above against the style rules and PR context.",
+    "REVIEW INSTRUCTIONS:",
+    "1. Read the actual diff content above carefully.",
+    "2. Only report issues in the changed code shown in the diffs.",
+    "3. For each finding, include the EXACT line number from the diff where the issue starts.",
+    "   - Use the lineStart field to specify the starting line number in the original file.",
+    "   - The line numbers in the diff correspond to line numbers in the actual file.",
+    "4. The 'before' field must contain the EXACT code from the diff (without line numbers).",
+    "5. The 'after' field must show the corrected version (without line numbers).",
+    "6. Do NOT flag issues in code that was NOT changed in this PR.",
+    "7. Do NOT assume code exists outside the diff — only review what's shown.",
+    "8. If a style rule is already followed in the changed code, do NOT flag it.",
+    "",
     "For each issue found, produce exactly one finding object with 'filePath' set to one",
     "of the changed files. Quote the problematic code snippet in 'before' and show the",
     "corrected version in 'after'. Be specific and actionable.",
