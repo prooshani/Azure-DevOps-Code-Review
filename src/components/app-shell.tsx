@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import {
@@ -64,7 +64,7 @@ export function AppShell({
           </div>
           <div className="sidebar-brand-text">
             <strong>ADO Review AI</strong>
-            <small>v0.1.0</small>
+            <small>v0.1.1</small>
           </div>
         </div>
 
@@ -148,3 +148,4 @@ export function AppShell({
     </div>
   );
 }
+

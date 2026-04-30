@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import {
@@ -91,7 +91,7 @@ export function AuthScreen({
           </div>
         </div>
 
-        <div className="auth-brand-foot">© ADO Review AI · MIT License · v0.1.0</div>
+        <div className="auth-brand-foot">Â© ADO Review AI Â· MIT License Â· v0.1.1</div>
        </div>
       </aside>
 
@@ -235,3 +235,4 @@ export function AuthScreen({
     </main>
   );
 }
+

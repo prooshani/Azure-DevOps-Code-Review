@@ -1326,28 +1326,33 @@ function AzureTab({
           </div>
         </div>
 
-        <div className="row" style={{ flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-          <button className="btn btn-primary btn-sm" onClick={onFetchRepos} disabled={Boolean(busy)}>
-            {busy ? <span className="spinner" /> : <IconRefresh />}
-            Fetch repositories
-          </button>
-          <a
-            className="btn btn-secondary btn-sm"
-            href="https://learn.microsoft.com/azure/devops/integrate/get-started/authentication/pats"
-            target="_blank"
-            rel="noreferrer"
-          >
-            <IconBook width={13} height={13} /> Create PAT
-            <IconExternal width={11} height={11} />
-          </a>
-          <span style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-            <span className="badge badge-info" style={{ fontSize: 11 }}>
+        {/* Divider + action row */}
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border-subtle)" }}>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <button className="btn btn-primary btn-sm" onClick={onFetchRepos} disabled={Boolean(busy)}>
+              {busy ? <span className="spinner" /> : <IconRefresh />}
+              Fetch repositories
+            </button>
+            <a
+              className="btn btn-secondary btn-sm"
+              href="https://learn.microsoft.com/azure/devops/integrate/get-started/authentication/pats"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <IconBook width={13} height={13} /> Create PAT
+              <IconExternal width={11} height={11} />
+            </a>
+          </div>
+          {/* Status strip — text only, clearly non-interactive */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, color: "var(--info)", fontWeight: 600 }}>
               <IconShield width={10} height={10} /> Stored locally
             </span>
-            <span className="badge" style={{ fontSize: 11 }}>
-              {settings.azure.selectedRepositories.length} selected
+            <span style={{ color: "var(--text-faint)", fontSize: 11 }}>·</span>
+            <span style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
+              {settings.azure.selectedRepositories.length} {settings.azure.selectedRepositories.length === 1 ? "repo" : "repos"} selected
             </span>
-          </span>
+          </div>
         </div>
       </article>
 
@@ -1796,7 +1801,7 @@ function AboutPage() {
               <p className="card-subtitle">Local-first, context-aware AI reviewer for Azure DevOps PRs.</p>
             </div>
           </div>
-          <span className="badge badge-brand">v0.1.0</span>
+          <span className="badge badge-brand">v0.1.1</span>
         </div>
 
         <p className="text-secondary" style={{ fontSize: 13.5, lineHeight: 1.7 }}>
@@ -1997,3 +2002,4 @@ function PrPreviewCard({
     </div>
   );
 }
+
