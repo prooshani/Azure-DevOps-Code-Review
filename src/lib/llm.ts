@@ -3,6 +3,27 @@ import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
 import type { ProviderConfig, ReviewFinding } from "./types";
 
+// Models that only support the completions endpoint (not chat)
+const COMPLETION_ONLY_MODELS = [
+  "code-davinci-002",
+  "code-davinci-001",
+  "code-cushman-001",
+  "davinci",
+  "curie",
+  "babbage",
+  "ada",
+  /codex/i, // Match any codex model
+];
+
+function isCompletionOnlyModel(model: string): boolean {
+  return COMPLETION_ONLY_MODELS.some(
+    (pattern) =>
+      pattern instanceof RegExp ? pattern.test(model) : pattern === model,
+  );
+}
+
+export { isCompletionOnlyModel };
+
 export async function discoverModels(provider: ProviderConfig): Promise<string[]> {
   if (provider.provider === "ollama") {
     const res = await fetch(`${provider.baseUrl ?? "http://localhost:11434"}/api/tags`);
@@ -67,7 +88,7 @@ export async function reviewWithProvider(input: {
     return extractFindings(res.text ?? "");
   }
 
-  // OpenAI (cloud), Ollama, LM Studio — all via OpenAI-compatible chat completions
+  // OpenAI (cloud), Ollama, LM Studio — all via OpenAI-compatible completions
   const isCloud = provider.provider === "openai";
   const openai = new OpenAI({
     apiKey: provider.apiKey ?? "local",
@@ -77,18 +98,33 @@ export async function reviewWithProvider(input: {
         (provider.provider === "ollama" ? "http://localhost:11434/v1" : "http://localhost:1234/v1"),
   });
 
-  const completion = await openai.chat.completions.create({
-    model,
-    max_tokens: 4096,
-    temperature: 0.1,
-    response_format: isCloud ? { type: "json_object" } : undefined,
-    messages: [
-      { role: "system", content: JSON_SYSTEM_PROMPT },
-      { role: "user", content: prompt },
-    ],
-  });
+  let findings: ReviewFinding[] = [];
 
-  return extractFindings(completion.choices[0]?.message?.content ?? "");
+  if (isCompletionOnlyModel(model)) {
+    // Completion-only models (Codex, Davinci, etc.) use /v1/completions
+    const completion = await openai.completions.create({
+      model,
+      prompt: `${JSON_SYSTEM_PROMPT}\n\n${prompt}`,
+      max_tokens: 4096,
+      temperature: 0.1,
+    });
+    findings = extractFindings(completion.choices[0]?.text ?? "");
+  } else {
+    // Chat models (GPT-3.5, GPT-4, etc.) use /v1/chat/completions
+    const completion = await openai.chat.completions.create({
+      model,
+      max_tokens: 4096,
+      temperature: 0.1,
+      response_format: isCloud ? { type: "json_object" } : undefined,
+      messages: [
+        { role: "system", content: JSON_SYSTEM_PROMPT },
+        { role: "user", content: prompt },
+      ],
+    });
+    findings = extractFindings(completion.choices[0]?.message?.content ?? "");
+  }
+
+  return findings;
 }
 
 /**

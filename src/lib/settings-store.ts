@@ -25,6 +25,7 @@ const schema = z.object({
       apiKey: z.string().optional(),
       baseUrl: z.string().optional(),
       model: z.string().optional(),
+      isActive: z.boolean().optional(),
     }),
   ),
   workspaceRoots: z.array(z.string().min(1)).default([]),

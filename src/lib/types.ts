@@ -5,6 +5,8 @@ export type ProviderConfig = {
   apiKey?: string;
   baseUrl?: string;
   model?: string;
+  isActive?: boolean;
+  label?: string;
 };
 
 export type AzureConfig = {

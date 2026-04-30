@@ -9,6 +9,7 @@ import type { ReviewFinding } from "@/lib/types";
  */
 function CodeWithLineNumbers({ code, startLine }: { code: string; startLine: number }) {
   const lines = code.split("\n");
+  const hasLineNumbers = startLine > 0;
 
   return (
     <pre className="finding-diff-code">
@@ -30,7 +31,9 @@ function CodeWithLineNumbers({ code, startLine }: { code: string; startLine: num
 
         return (
           <div key={idx} className={`finding-diff-line finding-diff-line-${lineType}`}>
-            <span className="finding-diff-line-num">{startLine + idx}</span>
+            <span className="finding-diff-line-num">
+              {hasLineNumbers ? startLine + idx : "???"}
+            </span>
             <span className="finding-diff-line-content">{displayLine || "\u00A0"}</span>
           </div>
         );
@@ -64,9 +67,13 @@ export function FindingCard({ finding }: { finding: ReviewFinding }) {
               (no file specified)
             </span>
           )}
-          {/* Only show line when it's a meaningful specific line (> 1) */}
-          {finding.lineStart > 1 ? (
+          {/* Only show line when it's a meaningful specific line (> 0) */}
+          {finding.lineStart > 0 ? (
             <span className="finding-line">L{finding.lineStart}</span>
+          ) : finding.lineStart === 0 && finding.filePath ? (
+            <span className="finding-line" style={{ color: "var(--text-muted)", fontStyle: "italic" }}>
+              ???
+            </span>
           ) : null}
         </div>
         <span className="finding-sev-badge">

@@ -4,17 +4,30 @@ import { reviewWithProvider } from "./llm";
 import { loadSettings } from "./settings-store";
 import { loadStyleProfile } from "./style-profile";
 import { appendReviewHistory } from "./user-store";
-import type { ReviewResult } from "./types";
+import type { ProviderConfig, ReviewResult } from "./types";
 
-export async function runReview(userId: string, pullRequestId: number): Promise<ReviewResult> {
+export async function runReview(userId: string, pullRequestId: number, overrideProvider?: ProviderConfig): Promise<ReviewResult> {
   const settings = await loadSettings(userId);
   if (!settings) {
     throw new Error("Settings missing. Save settings first.");
   }
 
-  const provider = settings.providers.find((x) => x.model);
+  // Priority: 1) explicit override, 2) active provider, 3) first provider with model
+  let provider: ProviderConfig | undefined;
+  let providerLabel = "";
+
+  if (overrideProvider?.model) {
+    provider = overrideProvider;
+    providerLabel = `${overrideProvider.provider}/${overrideProvider.model}`;
+  } else {
+    provider = settings.providers.find((x) => x.isActive) ?? settings.providers.find((x) => x.model);
+    if (provider) {
+      providerLabel = `${provider.provider}/${provider.model}`;
+    }
+  }
+
   if (!provider?.model) {
-    throw new Error("No provider model configured.");
+    throw new Error("No provider model configured. Please set a default provider in Settings > AI Providers, or select a provider below before running the review.");
   }
 
   const pr = await fetchPullRequestContext(settings, pullRequestId);
@@ -44,57 +57,104 @@ ${f.patch}
   const prompt = [
     `PR #${pr.pullRequestId}: "${pr.title}"`,
     `Branch: ${pr.sourceBranch ?? "?"} → ${pr.targetBranch ?? "?"}`,
-    pr.description ? `Description: ${pr.description.slice(0, 600)}` : "",
     "",
     `Linked work items:\n${workItems}`,
     `Related PRs:\n${relatedPRs}`,
     "",
-    "=== CHANGED FILES IN THIS PR (REVIEW SCOPE) ===",
-    "IMPORTANT: You MUST only produce findings for files listed below.",
-    "DO NOT comment on, reference, or audit any file that is NOT in this list.",
-    "If you notice a pattern that concerns other files outside this list, you MAY",
-    "briefly mention it as context inside a finding's 'why' field, but the 'filePath'",
-    "must still be one of the changed files.",
+    "=== CHANGED FILES ===",
+    "Review ONLY the code shown in the diffs below. DO NOT review, reference, or comment on any code NOT shown.",
+    "DO NOT hallucinate, invent, or assume code that is not explicitly shown in the diff.",
+    "",
     `${files}`,
-    "=== END OF CHANGED FILES ===",
+    "=== END CHANGED FILES ===",
     "",
     diffSections
-      ? `=== ACTUAL CODE DIFFS (USE THIS TO VERIFY FINDINGS) ===\n${diffSections}\n=== END ACTUAL CODE DIFFS ===`
-      : "NOTE: No diff content available. Review based on file paths only.",
+      ? `=== ACTUAL DIFFS (REVIEW ONLY THIS CODE) ===\n${diffSections}\n=== END ACTUAL DIFFS ===`
+      : "NOTE: No diff content available.",
     "",
     `Project style rules:\n${styleRules}`,
     "",
-    "REVIEW INSTRUCTIONS:",
-    "1. Read the actual diff content above carefully.",
-    "2. Only report issues in the changed code shown in the diffs.",
-    "3. For each finding, include the EXACT line number from the diff where the issue starts.",
-    "   - Use the lineStart field to specify the starting line number in the original file.",
-    "   - The line numbers in the diff correspond to line numbers in the actual file.",
-    "4. The 'before' field must contain the EXACT code from the diff (without line numbers).",
-    "5. The 'after' field must show the corrected version (without line numbers).",
-    "6. Do NOT flag issues in code that was NOT changed in this PR.",
-    "7. Do NOT assume code exists outside the diff — only review what's shown.",
-    "8. If a style rule is already followed in the changed code, do NOT flag it.",
+    "=== STRICT REVIEW RULES (FOLLOW EXACTLY) ===",
     "",
-    "For each issue found, produce exactly one finding object with 'filePath' set to one",
-    "of the changed files. Quote the problematic code snippet in 'before' and show the",
-    "corrected version in 'after'. Be specific and actionable.",
+    "1. SCOPE: Review ONLY the code shown in the diffs above.",
+    "   - If a line is not in the diff, DO NOT mention it.",
+    "   - If a method/class is not shown, DO NOT comment on it.",
+    "   - DO NOT use your training data to guess what code exists.",
+    "",
+    "2. LINE NUMBERS: Use the @@ header in the diff to determine line numbers.",
+    "   - Format: @@ -<start>,<count> +<start>,<count> @@",
+    "   - The first number after '-' is the original file starting line.",
+    "   - Count from that starting line to find the issue.",
+    "   - If you cannot determine the line number, use lineStart: 0.",
+    "",
+    "3. FINDINGS: Only report issues you can SEE in the diff.",
+    "   - If you cannot see the issue in the diff, DO NOT report it.",
+    "   - DO NOT report missing documentation for methods not shown.",
+    "   - DO NOT report missing error handling for methods not shown.",
+    "   - DO NOT report security issues that require context outside the diff.",
+    "",
+    "4. CODE SNIPPETS: Quote ONLY the exact code shown in the diff.",
+    "   - The 'before' field must match the diff EXACTLY.",
+    "   - The 'after' field must be a reasonable fix for the shown code.",
+    "   - If you cannot provide an accurate snippet, omit the finding.",
+    "",
+    "5. FALSE POSITIVES: It is better to miss a finding than to report a false one.",
+    "   - If you are uncertain, DO NOT report it.",
+    "   - If the issue requires context outside the diff, DO NOT report it.",
+    "   - If the code snippet you would quote does not exist, DO NOT report it.",
+    "",
+    "=== EXAMPLE OF CORRECT BEHAVIOR ===",
+    "✓ CORRECT: Diff shows 'if (x) Do();' → Report missing braces",
+    "✗ WRONG: Diff shows 'public void Foo()' → Report missing XML docs (method not fully shown)",
+    "✗ WRONG: Diff shows 'db.Query()' → Report missing try-catch (context outside diff)",
+    "✗ WRONG: Report line 34 when diff only shows lines 12-15",
+    "",
+    "=== OUTPUT FORMAT ===",
+    "Return ONLY valid JSON. No explanation, no markdown, no code fences.",
+    "Schema: {\"findings\":[{\"filePath\":\"string\",\"lineStart\":number,\"severity\":\"error\"|\"warning\"|\"info\",\"title\":\"string\",\"why\":\"string\",\"suggestion\":\"string\",\"before\":\"string\",\"after\":\"string\"}]}",
+    "",
+    "REMEMBER: Only report what you can SEE. If you cannot see it, do not report it.",
   ]
     .filter(Boolean)
     .join("\n");
 
   const findings = await reviewWithProvider({ provider, model: provider.model, prompt });
 
+  // Validate and filter findings - remove those with obviously wrong line numbers
+  const validFindings = findings.filter((f) => {
+    // Filter out findings with line numbers that are clearly wrong
+    // (line 0 means unknown, which is acceptable, but very high numbers are suspicious)
+    if (f.lineStart < 0 || f.lineStart > 10000) {
+      return false; // Unreasonable line number
+    }
+    // Filter out findings where the code snippet doesn't match the file path
+    // (this helps catch hallucinated findings)
+    if (f.filePath && f.before) {
+      // Basic validation: if the file path suggests a specific language,
+      // check if the code snippet looks reasonable
+      const ext = f.filePath.split(".").pop()?.toLowerCase();
+      if (ext === "cs" || ext === "cshtml") {
+        // C# files should have C#-like code
+        const hasCSharpKeywords = /\b(if|else|for|while|class|public|private|void|return|new|this|base)\b/i.test(f.before);
+        if (!hasCSharpKeywords && f.before.length > 10) {
+          // Might be a hallucinated finding
+          return false;
+        }
+      }
+    }
+    return true;
+  });
+
   const result: ReviewResult = {
     id: `${pullRequestId}-${Date.now()}`,
     createdAt: new Date().toISOString(),
-    summary: `Reviewed PR #${pullRequestId} with ${provider.provider}/${provider.model}. Found ${findings.length} issue(s).`,
+    summary: `Reviewed PR #${pullRequestId} with ${providerLabel}. Found ${validFindings.length} issue(s).`,
     sources: {
       pullRequestId,
       linkedWorkItemIds: pr.linkedWorkItemIds,
       relatedPullRequestIds: pr.relatedPullRequests.map((x) => x.id),
     },
-    findings,
+    findings: validFindings,
   };
 
   await appendReviewHistory(userId, result);

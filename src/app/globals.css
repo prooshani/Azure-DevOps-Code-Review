@@ -1138,6 +1138,17 @@ code,
 .provider-row-info small { font-size: 11.5px; color: var(--text-muted); }
 .provider-row-actions { display: flex; gap: 6px; }
 
+/* Active provider row */
+.provider-row-active {
+  border-color: var(--brand-2);
+  background: linear-gradient(135deg, rgba(124, 92, 255, 0.08) 0%, var(--bg-elevated) 50%);
+  box-shadow: 0 0 0 1px rgba(124, 92, 255, 0.2), 0 2px 8px rgba(124, 92, 255, 0.15);
+}
+.provider-row-active:hover {
+  border-color: var(--brand-1);
+  box-shadow: 0 0 0 1px rgba(124, 92, 255, 0.3), 0 4px 12px rgba(124, 92, 255, 0.2);
+}
+
 /* =================== Findings � Azure DevOps PR comment style =================== */
 .findings-list { display: grid; gap: 20px; }
 
@@ -1201,6 +1212,9 @@ code,
   padding: 3px 10px;
   border-radius: var(--r-pill);
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 .finding.sev-error   .finding-sev-badge { background: var(--danger-bg);  color: var(--danger-text);  border: 1px solid var(--danger-border); }
 .finding.sev-warning .finding-sev-badge { background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warning-border); }
@@ -1692,7 +1706,14 @@ code,
 }
 
 /* =================== History list =================== */
-.history-list { display: grid; gap: 0; border: 1.5px solid var(--border-strong); border-radius: 24px 8px 24px 8px; overflow: hidden; }
+.history-list {
+  display: grid;
+  gap: 0;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 24px 8px 24px 8px;
+  overflow: hidden;
+  padding: 12px;
+}
 .history-item {
   display: grid;
   grid-template-columns: auto 1fr auto;

@@ -40,6 +40,7 @@ import {
 } from "@/components/icons";
 import { SetupWizard } from "@/components/setup-wizard";
 import { ToastStack, useToast } from "@/components/toast";
+import { isCompletionOnlyModel } from "@/lib/llm";
 
 const PROVIDERS: LlmProvider[] = ["openai", "anthropic", "gemini", "ollama", "lmstudio"];
 const PROVIDER_META: Record<LlmProvider, { label: string; kind: "cloud" | "local"; emoji: string; defaultBase?: string }> = {
@@ -298,50 +299,115 @@ export default function HomePage() {
     }
   }
 
-  async function run() {
+  async function run(overrideProvider?: ProviderConfig) {
     if (!prId) {
       toast.error("PR number required");
       return;
     }
     setBusy("Running review...");
     try {
+      const body: { pullRequestId: number; provider?: ProviderConfig } = { pullRequestId: Number(prId) };
+      if (overrideProvider?.model) {
+        body.provider = overrideProvider;
+      }
       const json = await safeJson<ReviewResult>(
         await fetch("/api/review", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ pullRequestId: Number(prId) }),
+          body: JSON.stringify(body),
         }),
       );
       setReview(json);
       await loadHistory();
       toast.success("Review finished", json.summary);
     } catch (e) {
-      toast.error("Review failed", e instanceof Error ? e.message : undefined);
+      const msg = e instanceof Error ? e.message : "Unknown error";
+      toast.error("Review failed", msg);
     } finally {
       setBusy("");
     }
   }
 
-  function saveProvider() {
+  async function saveProvider() {
     if (!candidate.model) {
       toast.error("Pick a model", "Detect models then choose one to save.");
       return;
     }
-    setSettings({
+    const newSettings = {
       ...settings,
       providers: [
         ...settings.providers.filter((p) => p.provider !== candidate.provider),
-        { ...candidate },
-      ],
-    });
+        { ...candidate, isActive: true },
+      ].map((p) => ({
+        ...p,
+        isActive: p.provider === candidate.provider,
+      })),
+    };
+    setSettings(newSettings);
+
+    // Persist immediately
+    try {
+      await safeJson(
+        await fetch("/api/settings", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(newSettings),
+        }),
+      );
+    } catch (e) {
+      toast.error("Save failed", e instanceof Error ? e.message : undefined);
+    }
+
     toast.success("Provider saved", `${PROVIDER_META[candidate.provider].label} ready for reviews.`);
   }
 
-  function removeProvider(provider: LlmProvider) {
-    setSettings({
+  const setActiveProvider: (provider: LlmProvider) => Promise<void> = async (provider: LlmProvider) => {
+    const newSettings = {
+      ...settings,
+      providers: settings.providers.map((p) => ({
+        ...p,
+        isActive: p.provider === provider,
+      })),
+    };
+    setSettings(newSettings);
+
+    // Persist immediately so it survives app restart
+    try {
+      await safeJson(
+        await fetch("/api/settings", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(newSettings),
+        }),
+      );
+    } catch (e) {
+      toast.error("Save failed", e instanceof Error ? e.message : undefined);
+    }
+
+    const meta = PROVIDER_META[provider];
+    const active = newSettings.providers.find((p) => p.provider === provider);
+    toast.success("Active provider changed", `Now using ${meta.label} (${active?.model})`);
+  };
+
+  async function removeProvider(provider: LlmProvider) {
+    const newSettings = {
       ...settings,
       providers: settings.providers.filter((p) => p.provider !== provider),
-    });
+    };
+    setSettings(newSettings);
+
+    // Persist immediately
+    try {
+      await safeJson(
+        await fetch("/api/settings", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(newSettings),
+        }),
+      );
+    } catch (e) {
+      toast.error("Save failed", e instanceof Error ? e.message : undefined);
+    }
   }
 
   function loadProviderForEdit(p: ProviderConfig) {
@@ -357,12 +423,31 @@ export default function HomePage() {
     }
   }
 
+  function onRepeatReview(item: ReviewResult) {
+    // Extract provider/model from summary like "Reviewed PR #123 with openai/gpt-4o. Found X issue(s)."
+    const match = item.summary.match(/Reviewed PR #\d+ with (\w+)\/(\S+)/);
+    if (match) {
+      const [_, providerStr, model] = match;
+      const provider = settings.providers.find((p) => p.provider === (providerStr as LlmProvider) && p.model === model);
+      if (provider) {
+        setPrId(String(item.sources.pullRequestId));
+        run({ provider: provider.provider, apiKey: provider.apiKey, baseUrl: provider.baseUrl, model: provider.model });
+        toast.info("Repeat review", `Re-running with ${PROVIDER_META[provider.provider]?.label ?? provider.provider}/${model}`);
+        return;
+      }
+    }
+    // Fallback: use default provider
+    setPrId(String(item.sources.pullRequestId));
+    run();
+    toast.info("Repeat review", "No provider found in history — using default provider");
+  }
+
   // ---- gated view ----
   if (!user) {
     return <AuthScreen busy={authBusy} error={authError} onAuth={authenticate} onResume={me} />;
   }
 
-  const activeProvider = settings.providers.find((p) => p.model);
+  const activeProvider = settings.providers.find((p) => p.isActive) ?? settings.providers.find((p) => p.model);
   const statusItems = [
     { label: "Azure PAT", ok: hasPat },
     { label: "Repositories", ok: hasRepoSelection },
@@ -430,6 +515,7 @@ export default function HomePage() {
             history={history}
             onClearReview={() => setReview(null)}
             onViewReview={viewReview}
+            onRepeatReview={onRepeatReview}
           />
         ) : null}
 
@@ -461,6 +547,7 @@ export default function HomePage() {
             onLoadProviderForEdit={loadProviderForEdit}
             onBuildProfile={buildProfile}
             onSaveAll={saveAll}
+            onSetActiveProvider={setActiveProvider}
           />
         ) : null}
 
@@ -586,7 +673,7 @@ function DashboardPage({
           </div>
         </article>
 
-        <article className="card">
+        <article className="card" style={{ display: "flex", flexDirection: "column" }}>
           <div className="card-header">
             <div className="card-title-block">
               <h2>Recent reviews</h2>
@@ -603,17 +690,20 @@ function DashboardPage({
               <p>Run your first AI review and it will show up here for quick recall.</p>
             </div>
           ) : (
-            <div className="history-list">
-              {history.slice(0, 5).map((item) => (
+            <div
+              className="history-list"
+              style={{
+                flex: 1,
+                overflowY: "auto",
+                maxHeight: "280px",
+                paddingRight: 4,
+              }}
+            >
+              {history.slice(0, 4).map((item) => (
                 <HistoryRow key={item.id} item={item} onClick={() => onViewReview(item)} />
               ))}
             </div>
           )}
-          {last ? (
-            <p className="muted" style={{ marginTop: 8, fontSize: 12 }}>
-              Latest summary: {last.summary}
-            </p>
-          ) : null}
         </article>
       </section>
 
@@ -697,22 +787,57 @@ function HistoryRow({ item, onClick }: { item: ReviewResult; onClick?: () => voi
   const date = item.createdAt ? new Date(item.createdAt).toLocaleString() : "";
   const errorCount = item.findings.filter((f) => f.severity === "error").length;
   const warnCount = item.findings.filter((f) => f.severity === "warning").length;
+
   return (
     <button
       type="button"
-      className="history-item"
       onClick={onClick}
-      style={{ textAlign: "left", border: "1px solid var(--border-subtle)", font: "inherit", color: "inherit", cursor: onClick ? "pointer" : "default" }}
+      style={{
+        width: "100%",
+        textAlign: "left",
+        background: "transparent",
+        border: "1px solid var(--border-subtle)",
+        borderRadius: 8,
+        padding: "12px 16px",
+        margin: "8px 0",
+        cursor: onClick ? "pointer" : "default",
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        transition: "all 0.15s ease",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--brand)";
+        (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-elevated)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.borderColor = "var(--border-subtle)";
+        (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+      }}
     >
-      <span className="history-pr-id">#{item.sources.pullRequestId}</span>
-      <div className="history-info">
-        <strong>{item.summary}</strong>
-        <small>{date}</small>
+      <span className="history-pr-id" style={{ fontSize: 12, fontWeight: 600, color: "var(--brand)", whiteSpace: "nowrap" }}>
+        #{item.sources.pullRequestId}
+      </span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: 12.5,
+            fontWeight: 600,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            marginBottom: 2,
+          }}
+          title={item.summary}
+        >
+          {item.summary}
+        </div>
+        <div style={{ fontSize: 11, color: "var(--text-muted)" }}>{date}</div>
       </div>
-      <div className="history-meta">
-        {errorCount > 0 ? <span className="badge badge-danger">{errorCount} err</span> : null}
-        {warnCount > 0 ? <span className="badge badge-warning">{warnCount} warn</span> : null}
-        <span className="badge badge-info">{item.findings.length} total</span>
+      <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+        {errorCount > 0 && <span className="badge badge-danger" style={{ fontSize: 10, padding: "2px 6px" }}>{errorCount} err</span>}
+        {warnCount > 0 && <span className="badge badge-warning" style={{ fontSize: 10, padding: "2px 6px" }}>{warnCount} warn</span>}
+        <span className="badge badge-info" style={{ fontSize: 10, padding: "2px 6px" }}>{item.findings.length} total</span>
       </div>
     </button>
   );
@@ -750,10 +875,11 @@ function ReviewsPage({
   history,
   onClearReview,
   onViewReview,
+  onRepeatReview,
 }: {
   prId: string;
   setPrId: (s: string) => void;
-  run: () => void;
+  run: (overrideProvider?: ProviderConfig) => void;
   busy: string;
   setupComplete: boolean;
   settings: ReviewSettings;
@@ -761,6 +887,7 @@ function ReviewsPage({
   history: ReviewResult[];
   onClearReview: () => void;
   onViewReview: (item: ReviewResult) => void;
+  onRepeatReview: (item: ReviewResult) => void;
 }) {
   type SeverityFilter = "all" | "error" | "warning" | "info";
   const [severity, setSeverity] = useState<SeverityFilter>("all");
@@ -768,6 +895,7 @@ function ReviewsPage({
   const [prPreview, setPrPreview] = useState<PrPeekResult | null>(null);
   const [peekBusy, setPeekBusy] = useState(false);
   const [peekError, setPeekError] = useState<string | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<string>("");
 
   async function peekPr() {
     if (!prId || !settings.azure.pat) return;
@@ -803,7 +931,19 @@ function ReviewsPage({
     if (!prPreview && setupComplete) {
       await peekPr();
     }
-    run();
+    // Build provider override if one is selected
+    let overrideProvider: ProviderConfig | undefined;
+    if (selectedProvider) {
+      const parts = selectedProvider.split("/");
+      if (parts.length === 2) {
+        const [provider, model] = parts;
+        const cfg = settings.providers.find((p) => p.provider === (provider as LlmProvider) && p.model === model);
+        if (cfg) {
+          overrideProvider = { provider: cfg.provider, apiKey: cfg.apiKey, baseUrl: cfg.baseUrl, model: cfg.model };
+        }
+      }
+    }
+    run(overrideProvider);
   }
 
   const filteredFindings = useMemo(() => {
@@ -907,6 +1047,37 @@ function ReviewsPage({
             {busy ? "Reviewing…" : "Run review"}
           </button>
         </div>
+
+        {/* Provider/Model selector */}
+        <div className="field" style={{ marginTop: 12 }}>
+          <label className="field-label" htmlFor="review-provider">
+            AI Provider <span className="muted">(optional — uses default if empty)</span>
+          </label>
+          <select
+            id="review-provider"
+            className="select"
+            value={selectedProvider}
+            onChange={(e) => setSelectedProvider(e.target.value)}
+            disabled={Boolean(busy)}
+          >
+            <option value="">— Use default provider —</option>
+            {settings.providers
+              .filter((p) => p.model)
+              .map((p) => {
+                const m = PROVIDER_META[p.provider];
+                return (
+                  <option key={`${p.provider}/${p.model}`} value={`${p.provider}/${p.model}`}>
+                    {m?.label ?? p.provider} · {p.model}
+                    {p.isActive ? " (default)" : ""}
+                  </option>
+                );
+              })}
+          </select>
+          {settings.providers.filter((p) => p.model).length === 0 ? (
+            <span className="field-hint">No providers configured. Go to Settings → AI Providers to add one.</span>
+          ) : null}
+        </div>
+
         <span className="field-hint" style={{ marginTop: 4 }}>PR must live in one of your selected repositories. Press Enter or click Run.</span>
 
         {peekError ? (
@@ -920,14 +1091,25 @@ function ReviewsPage({
 
       {review ? (
         <section className="card">
-          <div className="card-header">
+          <div className="card-header" style={{ justifyContent: "space-between" }}>
             <div className="card-title-block">
               <h2>Review result · PR #{review.sources.pullRequestId}</h2>
               <span className="card-subtitle">{review.summary}</span>
             </div>
-            <button className="btn btn-ghost btn-icon" onClick={onClearReview} aria-label="Close review">
-              <IconX />
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => onRepeatReview(review)}
+                title="Repeat this review"
+                style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, padding: "4px 10px" }}
+              >
+                <IconRefresh width={12} height={12} />
+                Repeat
+              </button>
+              <button className="btn btn-ghost btn-icon" onClick={onClearReview} aria-label="Close review">
+                <IconX />
+              </button>
+            </div>
           </div>
 
           <div className="row" style={{ flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
@@ -1026,7 +1208,11 @@ function ReviewsPage({
             ) : (
               <div className="history-list">
                 {filteredHistory.map((item) => (
-                  <HistoryRow key={item.id} item={item} onClick={() => onViewReview(item)} />
+                  <HistoryRow
+                    key={item.id}
+                    item={item}
+                    onClick={() => onViewReview(item)}
+                  />
                 ))}
               </div>
             )}
@@ -1099,6 +1285,7 @@ function SettingsPage({
   onLoadProviderForEdit,
   onBuildProfile,
   onSaveAll,
+  onSetActiveProvider,
 }: {
   tab: SettingsTab;
   setTab: (t: SettingsTab) => void;
@@ -1121,11 +1308,12 @@ function SettingsPage({
   onFetchRepos: () => void;
   onDetectModels: () => void;
   onTestConnection: () => void;
-  onSaveProvider: () => void;
-  onRemoveProvider: (p: LlmProvider) => void;
+  onSaveProvider: () => Promise<void>;
+  onRemoveProvider: (p: LlmProvider) => Promise<void>;
   onLoadProviderForEdit: (p: ProviderConfig) => void;
   onBuildProfile: () => void;
   onSaveAll: () => void;
+  onSetActiveProvider: (p: LlmProvider) => Promise<void>;
 }) {
   return (
     <>
@@ -1186,6 +1374,7 @@ function SettingsPage({
           onSaveProvider={onSaveProvider}
           onRemoveProvider={onRemoveProvider}
           onLoadProviderForEdit={onLoadProviderForEdit}
+          onSetActiveProvider={onSetActiveProvider}
         />
       ) : null}
 
@@ -1436,6 +1625,7 @@ function AiTab({
   onSaveProvider,
   onRemoveProvider,
   onLoadProviderForEdit,
+  onSetActiveProvider,
 }: {
   settings: ReviewSettings;
   candidate: ProviderConfig;
@@ -1447,11 +1637,13 @@ function AiTab({
   providerStatus: Record<string, "ok" | "fail" | "unknown">;
   onDetectModels: () => void;
   onTestConnection: () => void;
-  onSaveProvider: () => void;
-  onRemoveProvider: (p: LlmProvider) => void;
+  onSaveProvider: () => Promise<void>;
+  onRemoveProvider: (p: LlmProvider) => Promise<void>;
   onLoadProviderForEdit: (p: ProviderConfig) => void;
+  onSetActiveProvider: (p: LlmProvider) => Promise<void>;
 }) {
   const meta = PROVIDER_META[candidate.provider];
+  const activeProvider = settings.providers.find((p) => p.isActive);
 
   return (
     <section className="grid-2" style={{ gridTemplateColumns: "1.05fr 1fr" }}>
@@ -1566,6 +1758,11 @@ function AiTab({
             </select>
             {models.length === 0 ? (
               <span className="field-hint">Click &quot;Detect models&quot; after entering credentials.</span>
+            ) : candidate.model && isCompletionOnlyModel(candidate.model) ? (
+              <span className="field-hint" style={{ color: "var(--warning)", display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
+                <IconActivity width={11} height={11} />
+                This is a completion-only model (not chat). It will use the legacy completions endpoint.
+              </span>
             ) : null}
           </div>
         </div>
@@ -1582,7 +1779,11 @@ function AiTab({
         <div className="card-header">
           <div className="card-title-block">
             <h2>Configured providers</h2>
-            <span className="card-subtitle">Active model is the first one with a value set.</span>
+            <span className="card-subtitle">
+              {activeProvider
+                ? `Active: ${PROVIDER_META[activeProvider.provider].label} (${activeProvider.model})`
+                : "No active provider — save a provider to set it as active"}
+            </span>
           </div>
           <span className="badge">{settings.providers.length} SAVED</span>
         </div>
@@ -1600,12 +1801,18 @@ function AiTab({
             {settings.providers.map((p) => {
               const m = PROVIDER_META[p.provider];
               const status = providerStatus[p.provider] ?? "unknown";
+              const isActive = p.isActive;
               return (
-                <div key={p.provider} className="provider-row">
+                <div key={p.provider} className={`provider-row ${isActive ? "provider-row-active" : ""}`}>
                   <div className="provider-logo">{m.emoji}</div>
                   <div className="provider-row-info">
                     <strong>
-                      {m.label}{" "}
+                      {m.label}
+                      {isActive ? (
+                        <span className="badge badge-success" style={{ marginLeft: 6, fontSize: 9.5, padding: "1px 7px" }}>
+                          <IconCheck width={9} height={9} /> Active
+                        </span>
+                      ) : null}
                       {status === "ok" ? (
                         <span className="badge badge-success" style={{ marginLeft: 6, fontSize: 9.5, padding: "1px 7px" }}>
                           <IconCheck width={9} height={9} /> tested
@@ -1622,6 +1829,44 @@ function AiTab({
                     </small>
                   </div>
                   <div className="provider-row-actions">
+                    {!isActive && (
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => onSetActiveProvider(p.provider)}
+                        aria-label="Set as default provider"
+                        title="Set as default"
+                        style={{
+                          fontSize: 11,
+                          padding: "4px 10px",
+                          height: "auto",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                        }}
+                      >
+                        <IconPlay width={11} height={11} />
+                        Set Default
+                      </button>
+                    )}
+                    {isActive && (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          padding: "3px 10px",
+                          borderRadius: "12px",
+                          background: "var(--success)",
+                          color: "white",
+                          fontWeight: 600,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 4,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        <IconCheck width={10} height={10} />
+                        Current
+                      </span>
+                    )}
                     <button
                       className="btn btn-ghost btn-icon"
                       onClick={() => onLoadProviderForEdit(p)}
