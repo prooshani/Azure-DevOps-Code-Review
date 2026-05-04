@@ -396,14 +396,53 @@ code,
 
 .source-card {
   border-width: 1.5px;
+  overflow: hidden;
+  background: var(--bg-elevated);
+  --source-header-glow-left: rgba(255, 255, 255, 0);
+  --source-header-glow-right: rgba(255, 255, 255, 0);
+  --source-header-band-top: rgba(255, 255, 255, 0);
+  --source-header-band-bottom: rgba(255, 255, 255, 0);
+}
+.source-card-azure {
+  border-color: rgba(46, 140, 229, 0.48);
+  --source-header-glow-left: rgba(0, 120, 212, 0.32);
+  --source-header-glow-right: rgba(56, 189, 248, 0.2);
+  --source-header-band-top: rgba(21, 75, 132, 0.68);
+  --source-header-band-bottom: rgba(21, 75, 132, 0);
 }
 .source-card-github {
-  border-color: rgba(96, 165, 250, 0.35);
-  background: linear-gradient(180deg, rgba(96, 165, 250, 0.08), var(--bg-elevated) 35%);
+  border-color: rgba(95, 143, 214, 0.5);
+  --source-header-glow-left: rgba(69, 112, 180, 0.28);
+  --source-header-glow-right: rgba(96, 165, 250, 0.2);
+  --source-header-band-top: rgba(34, 58, 95, 0.68);
+  --source-header-band-bottom: rgba(34, 58, 95, 0);
 }
 .source-card-local {
-  border-color: rgba(34, 197, 94, 0.35);
-  background: linear-gradient(180deg, rgba(34, 197, 94, 0.08), var(--bg-elevated) 35%);
+  border-color: rgba(39, 193, 137, 0.46);
+  --source-header-glow-left: rgba(16, 185, 129, 0.3);
+  --source-header-glow-right: rgba(45, 212, 191, 0.2);
+  --source-header-band-top: rgba(22, 88, 72, 0.66);
+  --source-header-band-bottom: rgba(22, 88, 72, 0);
+}
+.source-card .card-header {
+  position: relative;
+  margin: -22px -22px 18px;
+  padding: 16px 22px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.source-card .card-header::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 140% at 0% 0%, var(--source-header-glow-left) 0%, rgba(0, 0, 0, 0) 62%),
+    radial-gradient(90% 120% at 100% 0%, var(--source-header-glow-right) 0%, rgba(0, 0, 0, 0) 62%),
+    linear-gradient(180deg, var(--source-header-band-top) 0%, var(--source-header-band-bottom) 100%);
+  pointer-events: none;
+}
+.source-card .card-header > * {
+  position: relative;
+  z-index: 1;
 }
 .source-pill-logo {
   width: 14px;
