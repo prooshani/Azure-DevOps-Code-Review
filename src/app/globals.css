@@ -612,30 +612,39 @@ code,
   border-right: 1px solid rgba(255, 255, 255, 0.07);
   display: flex;
   flex-direction: column;
-  padding: 22px 14px;
+  /* No top padding: the brand row owns the top region and must align with the topbar height. */
+  padding: 0 14px 22px;
   gap: 4px;
   z-index: 10;
   overflow-y: auto;
   box-shadow: 2px 0 20px rgba(0, 0, 0, 0.35);
 }
 
+/* Brand row matches topbar height (68px) so the sidebar's bottom-border and
+   the topbar's bottom-border form a single continuous horizontal divider. */
 .sidebar-brand {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 12px 6px;
-  border-bottom: 1px solid var(--border-soft);
+  gap: 12px;
+  height: var(--topbar-h);
+  flex-shrink: 0;
+  /* full-bleed across the sidebar's 14px horizontal padding */
+  margin: 0 -14px 10px;
+  padding: 0 22px; /* aligns logo's left edge with nav-item icons (sidebar-pad 14 + nav-item-pad 10 - logo-inset adjustment) */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09); /* same color as .topbar bottom border */
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
 }
-.sidebar-brand-text strong { display: block; font-size: 13.5px; font-weight: 700; letter-spacing: -0.01em; }
-.sidebar-brand-text small { font-size: 10px; color: var(--text-muted); letter-spacing: 0.06em; text-transform: uppercase; }
+.sidebar-brand-text strong { display: block; font-size: 14.5px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.15; }
+.sidebar-brand-text small { font-size: 10px; color: var(--text-muted); letter-spacing: 0.08em; text-transform: uppercase; }
 
-/* Reviso brand logo (PNG) — sits where the gradient brand-mark used to */
+/* Reviso brand logo (PNG). Larger in the sidebar; .brand-logo-lg used on About. */
 .brand-logo {
-  width: 38px;
-  height: 38px;
+  width: 44px;
+  height: 44px;
   object-fit: contain;
   flex-shrink: 0;
   display: block;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
 }
 .brand-logo-lg { width: 56px; height: 56px; }
 
