@@ -2051,7 +2051,7 @@ function AboutPage() {
               <p className="card-subtitle">Local-first, context-aware AI reviewer for Azure DevOps PRs.</p>
             </div>
           </div>
-          <span className="badge badge-brand">v0.1.6</span>
+          <span className="badge badge-brand">v0.1.7</span>
         </div>
 
         <p className="text-secondary" style={{ fontSize: 13.5, lineHeight: 1.7 }}>

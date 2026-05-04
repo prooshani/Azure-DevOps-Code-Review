@@ -756,7 +756,10 @@ code,
    Notion / Linear. The CSS variable on .app-shell drives its X so it
    slides with the sidebar. Rounded-square + brand-tinted hover for polish. */
 .sidebar-toggle {
-  position: absolute;
+  /* Fixed so it pins to the viewport divider intersection regardless of
+     page scroll. The CSS variable is inherited from .app-shell (the
+     ancestor), so `left` still tracks the current sidebar width. */
+  position: fixed;
   top: calc(var(--topbar-h) - 14px);
   left: var(--sidebar-w-current);
   width: 28px;
@@ -1076,9 +1079,7 @@ code,
   padding: 32px 36px 48px;
   display: grid;
   gap: 24px;
-  max-width: 1280px;
   width: 100%;
-  margin: 0 auto;
 }
 
 /* =================== Dashboard / metrics =================== */
