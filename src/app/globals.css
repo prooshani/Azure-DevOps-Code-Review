@@ -615,19 +615,27 @@ code,
   border-right: 1px solid rgba(255, 255, 255, 0.07);
   display: flex;
   flex-direction: column;
-  /* No top padding: the brand row owns the top region and must align with the topbar height. */
   padding: 0 10px 22px;
   gap: 4px;
   z-index: 10;
-  overflow-y: auto;
-  overflow-x: hidden;
+  /* overflow: hidden during transitions so content clips cleanly inside the
+     shrinking/growing sidebar. Switched to overflow-y:auto after expand completes. */
+  overflow: hidden;
   box-shadow: 2px 0 20px rgba(0, 0, 0, 0.35);
-  transition: width 260ms cubic-bezier(.2, .7, .2, 1), padding 260ms cubic-bezier(.2, .7, .2, 1);
+  transition:
+    width 260ms cubic-bezier(.2, .7, .2, 1),
+    padding 260ms cubic-bezier(.2, .7, .2, 1),
+    overflow 0s 260ms; /* switch overflow-y:auto back only after width finishes growing */
 }
-/* In collapsed mode we let nav-item flyouts overflow horizontally. */
+/* Collapsed: flyout overflow kicks in, but only AFTER the shrink animation
+   completes (delay 260ms) so text doesn't spill out during the transition. */
 .sidebar.collapsed {
   overflow: visible;
   padding: 0 0 22px;
+  transition:
+    width 260ms cubic-bezier(.2, .7, .2, 1),
+    padding 260ms cubic-bezier(.2, .7, .2, 1),
+    overflow 0s 260ms;
 }
 
 /* Brand row matches topbar height (68px) so the sidebar's bottom-border and
@@ -638,17 +646,27 @@ code,
   gap: 10px;
   height: var(--topbar-h);
   flex-shrink: 0;
-  /* full-bleed across the sidebar's horizontal padding */
   margin: 0 -10px 10px;
   padding: 0 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.09); /* same color as .topbar bottom border */
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
+  transition:
+    margin 260ms cubic-bezier(.2, .7, .2, 1),
+    padding 260ms cubic-bezier(.2, .7, .2, 1),
+    gap 260ms cubic-bezier(.2, .7, .2, 1);
 }
 .sidebar-brand-text {
   display: flex;
   align-items: baseline;
   gap: 6px;
   min-width: 0;
+  overflow: hidden;
+  max-width: 160px;
+  opacity: 1;
+  /* Fade in with a delay so text appears once sidebar is mostly expanded. */
+  transition:
+    max-width 260ms cubic-bezier(.2, .7, .2, 1),
+    opacity 100ms ease 190ms;
 }
 .sidebar-brand-text strong {
   font-size: 17px;
@@ -671,11 +689,12 @@ code,
   object-fit: contain;
   flex-shrink: 0;
   display: block;
-  /* Eye art occupies ~70% of the transparent PNG canvas — a small negative
-     margin pulls the visible mark closer to the wordmark so the lockup reads
-     as a single unit instead of two disconnected elements. */
   margin: -4px -6px -4px -8px;
   filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5));
+  transition:
+    width 260ms cubic-bezier(.2, .7, .2, 1),
+    height 260ms cubic-bezier(.2, .7, .2, 1),
+    margin 260ms cubic-bezier(.2, .7, .2, 1);
 }
 .brand-logo-lg { width: 80px; height: 80px; margin: 0; }
 
@@ -687,6 +706,7 @@ code,
   letter-spacing: 0.1em;
   text-transform: uppercase;
   padding: 14px 10px 5px;
+  transition: opacity 80ms ease 190ms; /* fade in after sidebar mostly expanded */
 }
 
 .nav-item {
@@ -703,7 +723,14 @@ code,
   cursor: pointer;
   width: 100%;
   text-align: left;
-  transition: all var(--t-fast) var(--ease);
+  transition:
+    background 120ms var(--ease),
+    color 120ms var(--ease),
+    border-color 120ms var(--ease),
+    width 260ms cubic-bezier(.2, .7, .2, 1),
+    height 260ms cubic-bezier(.2, .7, .2, 1),
+    padding 260ms cubic-bezier(.2, .7, .2, 1),
+    margin 260ms cubic-bezier(.2, .7, .2, 1);
 }
 .nav-item:hover {
   background: var(--bg-hover);
@@ -721,7 +748,6 @@ code,
 .nav-item .nav-badge { margin-left: auto; }
 
 .sidebar-foot {
-  margin-top: auto;
   padding-top: 14px;
   border-top: 1px solid var(--border-soft);
 }
@@ -752,88 +778,60 @@ code,
 .user-chip-info small { font-size: 11px; color: var(--text-muted); }
 
 /* =================== Sidebar collapse / expand =================== */
-/* Floating chevron pill on the sidebar/topbar divider intersection, like
-   Notion / Linear. The CSS variable on .app-shell drives its X so it
-   slides with the sidebar. Rounded-square + brand-tinted hover for polish. */
-.sidebar-toggle {
-  /* Fixed so it pins to the viewport divider intersection regardless of
-     page scroll. The CSS variable is inherited from .app-shell (the
-     ancestor), so `left` still tracks the current sidebar width. */
-  position: fixed;
-  top: calc(var(--topbar-h) - 14px);
-  left: var(--sidebar-w-current);
-  width: 28px;
-  height: 28px;
-  border-radius: 9px;
-  background: linear-gradient(160deg, #2a3a5e, #182338);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: #c9d2e6;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-  z-index: 30;
-  box-shadow:
-    0 8px 22px rgba(0, 0, 0, 0.6),
-    0 0 0 1px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  /* The translateX is part of transform so we compose hover scale onto it. */
-  transform: translateX(-50%);
-  transition:
-    left 260ms cubic-bezier(.2, .7, .2, 1),
-    background 200ms,
-    border-color 200ms,
-    color 200ms,
-    box-shadow 200ms,
-    transform 220ms cubic-bezier(.2, .7, .2, 1);
+/* Sits at the bottom of the sidebar, just above the sidebar-foot divider.
+   margin-top: auto pushes it (and everything after) to the bottom. */
+.sidebar-collapse-btn {
+  margin-top: auto;
+  margin-bottom: 8px;
+  color: var(--text-muted);
 }
-.sidebar-toggle:hover {
-  background: var(--brand-grad);
-  border-color: rgba(255, 255, 255, 0.32);
-  color: #fff;
-  transform: translateX(-50%) scale(1.08);
-  box-shadow:
-    0 10px 28px rgba(124, 92, 255, 0.55),
-    0 0 0 1px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
-}
-.sidebar-toggle:active { transform: translateX(-50%) scale(0.96); }
-.sidebar-toggle svg {
-  width: 16px;
-  height: 16px;
-  stroke-width: 2.6;
-  transition: transform 260ms cubic-bezier(.2, .7, .2, 1);
-}
-/* Chevron points right when collapsed (= "expand"); points left when expanded. */
-.app-shell:not(.sidebar-collapsed) .sidebar-toggle svg { transform: rotate(180deg); }
+.sidebar-collapse-btn:hover { color: var(--text-primary); }
 
 /* nav-label is the text portion of every sidebar item — wrapped so we can
    collapse it independently of the icon without disturbing layout. */
 .nav-label {
   white-space: nowrap;
   overflow: hidden;
+  opacity: 1;
+  transition: opacity 100ms ease 190ms; /* fade in after sidebar mostly expanded */
 }
 
 /* ---------- Collapsed-mode sidebar internals ------------------------- */
-/* Brand row: just the eye, centered, divider line still aligns with topbar. */
+/* Brand row in collapsed: margin/gap/padding all transition to center the logo.
+   No justify-content change (not animatable). padding: 0 6px centers a 52px
+   logo in the 64px sidebar (6px each side), matching the logo's resting X in
+   expanded mode so the icon stays perfectly still. */
 .sidebar.collapsed .sidebar-brand {
   margin: 0;
-  padding: 0;
-  justify-content: center;
+  padding: 0 6px;
+  gap: 0;
 }
 .sidebar.collapsed .brand-logo {
   width: 52px;
   height: 52px;
   margin: 0;
 }
-.sidebar.collapsed .sidebar-brand-text { display: none; }
+/* Brand text fades out and collapses width instead of display:none,
+   so it transitions rather than snapping the layout. */
+.sidebar.collapsed .sidebar-brand-text {
+  opacity: 0;
+  max-width: 0;
+  pointer-events: none;
+  transition:
+    max-width 260ms cubic-bezier(.2, .7, .2, 1),
+    opacity 80ms ease 0ms; /* fade out fast before width finishes shrinking */
+}
 
-/* Section labels (WORKSPACE / RESOURCES) hidden in collapsed mode. */
-.sidebar.collapsed .sidebar-section-label { display: none; }
+/* Section labels fade out (kept in layout so icon positions don't jump). */
+.sidebar.collapsed .sidebar-section-label {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 80ms ease 0ms; /* override: fast fade-out when collapsing */
+}
 .sidebar.collapsed .sidebar-section {
   padding: 0;
   gap: 4px;
 }
-.sidebar.collapsed .sidebar-section:first-of-type { padding-top: 10px; }
 
 /* Nav-item geometry in collapsed mode.
    sidebar = 64px, tile = 40px, left margin = 12px (so icons sit ~6px right of
@@ -854,6 +852,9 @@ code,
   border-color: transparent;
   transition:
     width 260ms cubic-bezier(.2, .7, .2, 1),
+    height 260ms cubic-bezier(.2, .7, .2, 1),
+    padding 260ms cubic-bezier(.2, .7, .2, 1),
+    margin 260ms cubic-bezier(.2, .7, .2, 1),
     background-color 200ms,
     border-color 200ms,
     color 200ms,
@@ -869,7 +870,7 @@ code,
   opacity: 0;
   margin-left: 12px;
   padding-right: 16px;
-  transition: opacity 160ms ease 80ms;
+  transition: opacity 80ms ease 0ms; /* fast fade-out; overrides the expand delay from base */
 }
 /* Resting state of an active item in collapsed mode — colored tile, not
    a full pill, so the active marker is visible without overflowing. */
@@ -934,16 +935,14 @@ code,
   pointer-events: auto;
 }
 
-/* Mobile: collapse toggle is irrelevant — sidebar is hidden behind hamburger.
-   Force expanded layout when the off-canvas drawer opens, and hide the toggle. */
+/* Mobile: collapse is irrelevant — sidebar is the off-canvas drawer. */
 @media (max-width: 960px) {
-  .sidebar-toggle { display: none; }
   .app-shell.sidebar-collapsed { --sidebar-w-current: 240px; }
   .sidebar.collapsed { width: 268px; padding: 0 10px 22px; overflow-y: auto; overflow-x: hidden; }
-  .sidebar.collapsed .sidebar-brand { margin: 0 -10px 10px; padding: 0 14px; justify-content: flex-start; }
+  .sidebar.collapsed .sidebar-brand { margin: 0 -10px 10px; padding: 0 14px; gap: 10px; }
   .sidebar.collapsed .brand-logo { width: 64px; height: 64px; margin: -4px -6px -4px -8px; }
-  .sidebar.collapsed .sidebar-brand-text { display: flex; }
-  .sidebar.collapsed .sidebar-section-label { display: block; }
+  .sidebar.collapsed .sidebar-brand-text { opacity: 1; max-width: 160px; pointer-events: auto; }
+  .sidebar.collapsed .sidebar-section-label { opacity: 1; pointer-events: auto; }
   .sidebar.collapsed .sidebar-section { padding: 0; gap: 2px; }
   .sidebar.collapsed .nav-item {
     width: 100%; padding: 9px 10px; height: auto; margin-left: 0;
@@ -961,6 +960,7 @@ code,
 
 /* Main */
 .main-area {
+  flex: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;

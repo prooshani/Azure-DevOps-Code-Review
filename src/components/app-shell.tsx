@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import {
   IconActivity,
-  IconChevronRight,
   IconHelp,
   IconHome,
   IconInfo,
@@ -11,6 +10,7 @@ import {
   IconMenu,
   IconReview,
   IconSettings,
+  IconSidebarToggle,
 } from "./icons";
 import type { AuthUser } from "./auth-screen";
 
@@ -122,6 +122,16 @@ export function AppShell({
           </a>
         </div>
 
+        <button
+          type="button"
+          className="nav-item sidebar-collapse-btn"
+          onClick={() => setCollapsed((v) => !v)}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          <IconSidebarToggle className="nav-icon" />
+          <span className="nav-label">{collapsed ? "Expand" : "Collapse"}</span>
+        </button>
+
         <div className="sidebar-foot">
           <div className="user-chip">
             <div className="user-avatar" aria-hidden>
@@ -137,15 +147,6 @@ export function AppShell({
           </div>
         </div>
       </aside>
-
-      <button
-        type="button"
-        className="sidebar-toggle"
-        onClick={() => setCollapsed((v) => !v)}
-        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-      >
-        <IconChevronRight />
-      </button>
 
       <div className="main-area">
         <header className="topbar">

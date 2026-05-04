@@ -293,3 +293,10 @@ export const IconBook = (p: IconProps) => (
     <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
   </Icon>
 );
+
+export const IconSidebarToggle = (p: IconProps) => (
+  <Icon {...p}>
+    <rect x="2" y="3" width="20" height="18" rx="2" />
+    <line x1="8" y1="3" x2="8" y2="21" />
+  </Icon>
+);
