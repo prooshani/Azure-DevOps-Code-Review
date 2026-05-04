@@ -597,8 +597,8 @@ code,
 
 /* =================== App shell =================== */
 .app-shell {
-  --sidebar-w-current: 252px;
-  --sidebar-collapsed-w: 72px;
+  --sidebar-w-current: 240px;
+  --sidebar-collapsed-w: 64px;
   min-height: 100vh;
   display: flex;
   position: relative;
@@ -616,7 +616,7 @@ code,
   display: flex;
   flex-direction: column;
   /* No top padding: the brand row owns the top region and must align with the topbar height. */
-  padding: 0 14px 22px;
+  padding: 0 10px 22px;
   gap: 4px;
   z-index: 10;
   overflow-y: auto;
@@ -638,9 +638,9 @@ code,
   gap: 10px;
   height: var(--topbar-h);
   flex-shrink: 0;
-  /* full-bleed across the sidebar's 14px horizontal padding */
-  margin: 0 -14px 10px;
-  padding: 0 16px;
+  /* full-bleed across the sidebar's horizontal padding */
+  margin: 0 -10px 10px;
+  padding: 0 14px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.09); /* same color as .topbar bottom border */
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
 }
@@ -752,32 +752,54 @@ code,
 .user-chip-info small { font-size: 11px; color: var(--text-muted); }
 
 /* =================== Sidebar collapse / expand =================== */
-/* Floating circular chevron tab on the sidebar's right edge. Sits half over
-   the divider line, exactly like Notion / Linear. The CSS variable on
-   .app-shell drives its X position so the button slides with the sidebar. */
+/* Floating chevron pill on the sidebar/topbar divider intersection, like
+   Notion / Linear. The CSS variable on .app-shell drives its X so it
+   slides with the sidebar. Rounded-square + brand-tinted hover for polish. */
 .sidebar-toggle {
   position: absolute;
-  top: calc(var(--topbar-h) - 12px);
+  top: calc(var(--topbar-h) - 14px);
   left: var(--sidebar-w-current);
-  transform: translateX(-50%);
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--bg-elevated, #1a2740);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  color: var(--text-secondary);
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: linear-gradient(160deg, #2a3a5e, #182338);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #c9d2e6;
   display: grid;
   place-items: center;
   cursor: pointer;
   z-index: 30;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
-  transition: left 260ms cubic-bezier(.2, .7, .2, 1), background 160ms, color 160ms, transform 220ms;
+  box-shadow:
+    0 8px 22px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  /* The translateX is part of transform so we compose hover scale onto it. */
+  transform: translateX(-50%);
+  transition:
+    left 260ms cubic-bezier(.2, .7, .2, 1),
+    background 200ms,
+    border-color 200ms,
+    color 200ms,
+    box-shadow 200ms,
+    transform 220ms cubic-bezier(.2, .7, .2, 1);
 }
 .sidebar-toggle:hover {
-  background: var(--bg-hover, #22324f);
-  color: var(--text-primary);
+  background: var(--brand-grad);
+  border-color: rgba(255, 255, 255, 0.32);
+  color: #fff;
+  transform: translateX(-50%) scale(1.08);
+  box-shadow:
+    0 10px 28px rgba(124, 92, 255, 0.55),
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
-.sidebar-toggle svg { width: 13px; height: 13px; transition: transform 260ms cubic-bezier(.2, .7, .2, 1); }
+.sidebar-toggle:active { transform: translateX(-50%) scale(0.96); }
+.sidebar-toggle svg {
+  width: 16px;
+  height: 16px;
+  stroke-width: 2.6;
+  transition: transform 260ms cubic-bezier(.2, .7, .2, 1);
+}
 /* Chevron points right when collapsed (= "expand"); points left when expanded. */
 .app-shell:not(.sidebar-collapsed) .sidebar-toggle svg { transform: rotate(180deg); }
 
@@ -789,39 +811,44 @@ code,
 }
 
 /* ---------- Collapsed-mode sidebar internals ------------------------- */
+/* Brand row: just the eye, centered, divider line still aligns with topbar. */
 .sidebar.collapsed .sidebar-brand {
   margin: 0;
   padding: 0;
   justify-content: center;
 }
 .sidebar.collapsed .brand-logo {
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
   margin: 0;
 }
 .sidebar.collapsed .sidebar-brand-text { display: none; }
 
 /* Section labels (WORKSPACE / RESOURCES) hidden in collapsed mode. */
 .sidebar.collapsed .sidebar-section-label { display: none; }
-/* Add a small top spacer so the first icon of each section doesn't hug the divider. */
-.sidebar.collapsed .sidebar-section { padding-top: 10px; }
-.sidebar.collapsed .sidebar-section + .sidebar-section { padding-top: 6px; }
+.sidebar.collapsed .sidebar-section {
+  padding: 0;
+  gap: 4px;
+}
+.sidebar.collapsed .sidebar-section:first-of-type { padding-top: 10px; }
 
-/* Nav items in collapsed mode: square 44px tile centered on the sidebar.
-   On hover, the tile grows horizontally into the main area as a floating
-   pill that reveals the label — no other items move. */
-.sidebar.collapsed .sidebar-section { padding: 0; gap: 4px; }
+/* Nav-item geometry in collapsed mode.
+   sidebar = 64px, tile = 40px, left margin = 12px (so icons sit ~6px right of
+   the brand-row's logo center, balanced visually).
+   On hover the tile grows from 40 -> 200px (right-anchored — icon stays put)
+   and gains a SOLID background + heavy shadow so the floating reveal sits
+   cleanly on top of any main-area content it overlaps. */
 .sidebar.collapsed .nav-item {
   position: relative;
-  width: 44px;
-  /* Anchor at the sidebar's left padding so the icon stays put when the
-     pill grows on hover — i.e. the right edge animates, not the icon. */
-  margin-left: 14px;
+  width: 40px;
+  margin-left: 12px;
   padding: 0;
   height: 40px;
   justify-content: flex-start;
   overflow: hidden;
   z-index: 1;
+  background: transparent;
+  border-color: transparent;
   transition:
     width 260ms cubic-bezier(.2, .7, .2, 1),
     background-color 200ms,
@@ -833,50 +860,70 @@ code,
   width: 18px;
   height: 18px;
   flex: 0 0 18px;
-  margin-left: 13px; /* (44 - 18) / 2 — visually centers the icon in the 44px tile */
+  margin-left: 11px; /* (40 - 18) / 2 — centers icon in the 40px tile */
 }
 .sidebar.collapsed .nav-item .nav-label {
   opacity: 0;
   margin-left: 12px;
-  padding-right: 14px;
-  transition: opacity 180ms ease 60ms;
+  padding-right: 16px;
+  transition: opacity 160ms ease 80ms;
 }
+/* Resting state of an active item in collapsed mode — colored tile, not
+   a full pill, so the active marker is visible without overflowing. */
+.sidebar.collapsed .nav-item.active {
+  background: rgba(124, 92, 255, 0.22);
+  border-color: rgba(124, 92, 255, 0.4);
+}
+/* Hover flyout — opaque so it cleanly covers main-area content beneath. */
 .sidebar.collapsed .nav-item:hover {
-  width: 200px;
+  width: 210px;
   z-index: 5;
-  background: var(--bg-hover);
+  background: var(--bg-elevated);
+  border-color: rgba(255, 255, 255, 0.10);
   color: var(--text-primary);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  box-shadow:
+    0 14px 36px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(0, 0, 0, 0.4);
 }
 .sidebar.collapsed .nav-item.active:hover {
-  background: rgba(124, 92, 255, 0.22);
-  border-color: rgba(124, 92, 255, 0.45);
+  background: linear-gradient(135deg, #2a2150 0%, #1f3a6c 100%);
+  border-color: rgba(124, 92, 255, 0.6);
+  color: #e2d4ff;
 }
 .sidebar.collapsed .nav-item:hover .nav-label { opacity: 1; }
 
-/* Foot / user chip: in collapsed mode show only the avatar; expand on hover. */
+/* Foot / user chip — same flyout treatment, opaque background. */
 .sidebar.collapsed .sidebar-foot { padding: 14px 0 0; }
 .sidebar.collapsed .user-chip {
   position: relative;
-  width: 44px;
-  margin-left: 14px;
-  padding: 6px;
+  width: 40px;
+  margin-left: 12px;
+  padding: 5px;
   overflow: hidden;
   justify-content: flex-start;
+  border-color: transparent;
+  background: transparent;
   transition:
     width 260ms cubic-bezier(.2, .7, .2, 1),
     background-color 200ms,
-    box-shadow 200ms;
+    border-color 200ms,
+    box-shadow 200ms,
+    padding 200ms;
 }
 .sidebar.collapsed .user-chip-info,
 .sidebar.collapsed .user-chip-logout {
   opacity: 0;
   pointer-events: none;
-  transition: opacity 180ms ease 60ms;
+  transition: opacity 160ms ease 80ms;
 }
 .sidebar.collapsed .user-chip:hover {
-  width: 220px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  width: 230px;
+  padding: 8px 10px;
+  background: var(--bg-elevated);
+  border-color: rgba(255, 255, 255, 0.10);
+  box-shadow:
+    0 14px 36px rgba(0, 0, 0, 0.65),
+    0 0 0 1px rgba(0, 0, 0, 0.4);
 }
 .sidebar.collapsed .user-chip:hover .user-chip-info,
 .sidebar.collapsed .user-chip:hover .user-chip-logout {
@@ -888,19 +935,23 @@ code,
    Force expanded layout when the off-canvas drawer opens, and hide the toggle. */
 @media (max-width: 960px) {
   .sidebar-toggle { display: none; }
-  .app-shell.sidebar-collapsed { --sidebar-w-current: 252px; }
-  .sidebar.collapsed { width: 268px; padding: 0 14px 22px; overflow-y: auto; overflow-x: hidden; }
-  .sidebar.collapsed .sidebar-brand { margin: 0 -14px 10px; padding: 0 16px; justify-content: flex-start; }
+  .app-shell.sidebar-collapsed { --sidebar-w-current: 240px; }
+  .sidebar.collapsed { width: 268px; padding: 0 10px 22px; overflow-y: auto; overflow-x: hidden; }
+  .sidebar.collapsed .sidebar-brand { margin: 0 -10px 10px; padding: 0 14px; justify-content: flex-start; }
   .sidebar.collapsed .brand-logo { width: 64px; height: 64px; margin: -4px -6px -4px -8px; }
   .sidebar.collapsed .sidebar-brand-text { display: flex; }
-  .sidebar.collapsed .sidebar-section-label { height: auto; padding: 14px 10px 5px; opacity: 1; }
+  .sidebar.collapsed .sidebar-section-label { display: block; }
   .sidebar.collapsed .sidebar-section { padding: 0; gap: 2px; }
-  .sidebar.collapsed .nav-item { width: 100%; padding: 9px 10px; height: auto; overflow: visible; }
+  .sidebar.collapsed .nav-item {
+    width: 100%; padding: 9px 10px; height: auto; margin-left: 0;
+    overflow: visible; background: transparent; border-color: transparent;
+  }
+  .sidebar.collapsed .nav-item.active { background: rgba(124, 92, 255, 0.16); border-color: rgba(124, 92, 255, 0.32); }
   .sidebar.collapsed .nav-item .nav-icon { margin-left: 0; }
   .sidebar.collapsed .nav-item .nav-label { opacity: 1; margin-left: 0; padding-right: 0; }
-  .sidebar.collapsed .nav-item:hover { width: 100%; box-shadow: none; }
-  .sidebar.collapsed .sidebar-foot { padding-top: 14px; padding-left: 0; padding-right: 0; }
-  .sidebar.collapsed .user-chip { width: 100%; padding: 8px 10px; overflow: visible; }
+  .sidebar.collapsed .nav-item:hover { width: 100%; box-shadow: none; background: var(--bg-hover); }
+  .sidebar.collapsed .sidebar-foot { padding: 14px 0 0; }
+  .sidebar.collapsed .user-chip { width: 100%; margin-left: 0; padding: 8px 10px; overflow: visible; background: var(--bg-elevated); border-color: var(--border-subtle); }
   .sidebar.collapsed .user-chip-info,
   .sidebar.collapsed .user-chip-logout { opacity: 1; pointer-events: auto; }
 }

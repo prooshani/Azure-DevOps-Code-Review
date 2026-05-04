@@ -77,7 +77,7 @@ export function AppShell({
           <img src="/reviso-icon.png" alt="Reviso" className="brand-logo" />
           <div className="sidebar-brand-text">
             <strong>
-              Reviso <span className="brand-version">(v0.1.5)</span>
+              Reviso <span className="brand-version">(v0.1.6)</span>
             </strong>
           </div>
         </div>
@@ -92,7 +92,6 @@ export function AppShell({
                 className={`nav-item ${page === item.id ? "active" : ""}`}
                 onClick={() => selectPage(item.id)}
                 type="button"
-                title={collapsed ? item.label : undefined}
               >
                 <Icon className="nav-icon" />
                 <span className="nav-label">{item.label}</span>
@@ -108,7 +107,6 @@ export function AppShell({
             href="https://learn.microsoft.com/azure/devops/integrate/get-started/authentication/pats"
             target="_blank"
             rel="noreferrer"
-            title={collapsed ? "PAT Guide" : undefined}
           >
             <IconHelp className="nav-icon" />
             <span className="nav-label">PAT Guide</span>
@@ -118,7 +116,6 @@ export function AppShell({
             href="https://github.com/"
             target="_blank"
             rel="noreferrer"
-            title={collapsed ? "What's new" : undefined}
           >
             <IconActivity className="nav-icon" />
             <span className="nav-label">What&apos;s new</span>
@@ -126,7 +123,7 @@ export function AppShell({
         </div>
 
         <div className="sidebar-foot">
-          <div className="user-chip" title={collapsed ? `${user.name || "Local user"} — ${user.email}` : undefined}>
+          <div className="user-chip">
             <div className="user-avatar" aria-hidden>
               {initials}
             </div>
@@ -146,7 +143,6 @@ export function AppShell({
         className="sidebar-toggle"
         onClick={() => setCollapsed((v) => !v)}
         aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       >
         <IconChevronRight />
       </button>
