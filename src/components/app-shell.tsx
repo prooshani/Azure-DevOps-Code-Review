@@ -1,8 +1,9 @@
-﻿"use client";
+"use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   IconActivity,
+  IconChevronRight,
   IconHelp,
   IconHome,
   IconInfo,
@@ -29,6 +30,8 @@ const PAGE_TITLES: Record<Page, { title: string; subtitle: string }> = {
   about: { title: "About", subtitle: "App information, version and credits" },
 };
 
+const COLLAPSED_KEY = "reviso.sidebar.collapsed";
+
 export function AppShell({
   page,
   setPage,
@@ -47,6 +50,19 @@ export function AppShell({
   const initials = (user.name || user.email).slice(0, 2).toUpperCase();
   const meta = PAGE_TITLES[page];
   const [navOpen, setNavOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Restore collapsed state once on mount; persist on every change.
+  // Reading localStorage must happen post-hydration to avoid SSR/CSR mismatch.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCollapsed(window.localStorage.getItem(COLLAPSED_KEY) === "1");
+  }, []);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    window.localStorage.setItem(COLLAPSED_KEY, collapsed ? "1" : "0");
+  }, [collapsed]);
 
   function selectPage(p: Page) {
     setPage(p);
@@ -54,14 +70,14 @@ export function AppShell({
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${collapsed ? "sidebar-collapsed" : ""}`}>
       {navOpen ? <div className="sidebar-backdrop" onClick={() => setNavOpen(false)} /> : null}
-      <aside className={`sidebar ${navOpen ? "open" : ""}`}>
+      <aside className={`sidebar ${navOpen ? "open" : ""} ${collapsed ? "collapsed" : ""}`}>
         <div className="sidebar-brand">
           <img src="/reviso-icon.png" alt="Reviso" className="brand-logo" />
           <div className="sidebar-brand-text">
             <strong>
-              Reviso <span className="brand-version">(v0.1.4)</span>
+              Reviso <span className="brand-version">(v0.1.5)</span>
             </strong>
           </div>
         </div>
@@ -76,9 +92,10 @@ export function AppShell({
                 className={`nav-item ${page === item.id ? "active" : ""}`}
                 onClick={() => selectPage(item.id)}
                 type="button"
+                title={collapsed ? item.label : undefined}
               >
                 <Icon className="nav-icon" />
-                <span>{item.label}</span>
+                <span className="nav-label">{item.label}</span>
               </button>
             );
           })}
@@ -91,23 +108,25 @@ export function AppShell({
             href="https://learn.microsoft.com/azure/devops/integrate/get-started/authentication/pats"
             target="_blank"
             rel="noreferrer"
+            title={collapsed ? "PAT Guide" : undefined}
           >
             <IconHelp className="nav-icon" />
-            <span>PAT Guide</span>
+            <span className="nav-label">PAT Guide</span>
           </a>
           <a
             className="nav-item"
             href="https://github.com/"
             target="_blank"
             rel="noreferrer"
+            title={collapsed ? "What's new" : undefined}
           >
             <IconActivity className="nav-icon" />
-            <span>What&apos;s new</span>
+            <span className="nav-label">What&apos;s new</span>
           </a>
         </div>
 
         <div className="sidebar-foot">
-          <div className="user-chip">
+          <div className="user-chip" title={collapsed ? `${user.name || "Local user"} — ${user.email}` : undefined}>
             <div className="user-avatar" aria-hidden>
               {initials}
             </div>
@@ -115,12 +134,22 @@ export function AppShell({
               <strong>{user.name || "Local user"}</strong>
               <small>{user.email}</small>
             </div>
-            <button className="btn btn-ghost btn-icon" onClick={onLogout} aria-label="Logout" title="Logout">
+            <button className="btn btn-ghost btn-icon user-chip-logout" onClick={onLogout} aria-label="Logout" title="Logout">
               <IconLogout width={15} height={15} />
             </button>
           </div>
         </div>
       </aside>
+
+      <button
+        type="button"
+        className="sidebar-toggle"
+        onClick={() => setCollapsed((v) => !v)}
+        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+      >
+        <IconChevronRight />
+      </button>
 
       <div className="main-area">
         <header className="topbar">
@@ -146,4 +175,3 @@ export function AppShell({
     </div>
   );
 }
-
