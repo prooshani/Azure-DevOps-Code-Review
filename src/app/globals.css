@@ -625,20 +625,25 @@ code,
 .sidebar-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   height: var(--topbar-h);
   flex-shrink: 0;
   /* full-bleed across the sidebar's 14px horizontal padding */
   margin: 0 -14px 10px;
-  padding: 0 22px; /* aligns logo's left edge with nav-item icons (sidebar-pad 14 + nav-item-pad 10 - logo-inset adjustment) */
+  padding: 0 16px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.09); /* same color as .topbar bottom border */
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
 }
+.sidebar-brand-text {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
 .sidebar-brand-text strong {
-  display: block;
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   line-height: 1;
   color: var(--text-primary);
 }
@@ -646,20 +651,23 @@ code,
   font-size: 10.5px;
   font-weight: 500;
   color: var(--text-muted);
-  margin-left: 2px;
   letter-spacing: 0;
 }
 
-/* Reviso brand logo (PNG). Larger in the sidebar; .brand-logo-lg used on About. */
+/* Reviso brand logo (PNG). Fills sidebar brand row vertically. */
 .brand-logo {
-  width: 48px;
-  height: 48px;
+  width: 64px;
+  height: 64px;
   object-fit: contain;
   flex-shrink: 0;
   display: block;
-  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45));
+  /* Eye art occupies ~70% of the transparent PNG canvas — a small negative
+     margin pulls the visible mark closer to the wordmark so the lockup reads
+     as a single unit instead of two disconnected elements. */
+  margin: -4px -6px -4px -8px;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.5));
 }
-.brand-logo-lg { width: 64px; height: 64px; }
+.brand-logo-lg { width: 80px; height: 80px; margin: 0; }
 
 .sidebar-section { display: grid; gap: 2px; }
 .sidebar-section-label {
