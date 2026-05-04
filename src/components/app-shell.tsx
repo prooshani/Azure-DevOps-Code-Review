@@ -60,8 +60,9 @@ export function AppShell({
         <div className="sidebar-brand">
           <img src="/reviso-icon.png" alt="Reviso" className="brand-logo" />
           <div className="sidebar-brand-text">
-            <strong>Reviso</strong>
-            <small>v0.1.4</small>
+            <strong>
+              Reviso <span className="brand-version">(v0.1.4)</span>
+            </strong>
           </div>
         </div>
 
