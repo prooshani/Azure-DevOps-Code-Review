@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useMemo, useState } from "react";
 import type {
@@ -6,6 +6,7 @@ import type {
   ProviderConfig,
   ReviewResult,
   ReviewSettings,
+  ReviewTarget,
   StyleProfile,
 } from "@/lib/types";
 import { AppShell, type Page } from "@/components/app-shell";
@@ -37,6 +38,8 @@ import {
   IconSparkles,
   IconTrash,
   IconX,
+  IconAzureLogo,
+  IconGithubLogo,
 } from "@/components/icons";
 import { SetupWizard } from "@/components/setup-wizard";
 import { ToastStack, useToast } from "@/components/toast";
@@ -59,13 +62,33 @@ type RepoPick = {
   repositoryName: string;
 };
 
+type GithubRepoPick = {
+  owner: string;
+  name: string;
+  fullName: string;
+};
+
+function uniqueAzureRepos(items: RepoPick[]): RepoPick[] {
+  const map = new Map<string, RepoPick>();
+  for (const item of items) map.set(item.repositoryId, item);
+  return [...map.values()];
+}
+
+function uniqueGithubRepos(items: GithubRepoPick[]): GithubRepoPick[] {
+  const map = new Map<string, GithubRepoPick>();
+  for (const item of items) map.set(item.fullName, item);
+  return [...map.values()];
+}
+
 const initialSettings: ReviewSettings = {
   azure: { pat: "", selectedRepositories: [] },
+  github: { token: "", selectedRepositories: [] },
+  local: { selectedRepositories: [] },
   providers: [],
   workspaceRoots: ["C:/"],
 };
 
-type SettingsTab = "azure" | "ai" | "workspace";
+type SettingsTab = "source" | "ai" | "workspace";
 
 export default function HomePage() {
   // ---- auth ----
@@ -75,13 +98,14 @@ export default function HomePage() {
 
   // ---- nav ----
   const [page, setPage] = useState<Page>("dashboard");
-  const [settingsTab, setSettingsTab] = useState<SettingsTab>("azure");
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>("source");
 
   // ---- data ----
   const [settings, setSettings] = useState<ReviewSettings>(initialSettings);
   const [candidate, setCandidate] = useState<ProviderConfig>({ provider: "openai" });
   const [models, setModels] = useState<string[]>([]);
   const [repos, setRepos] = useState<RepoPick[]>([]);
+  const [githubRepos, setGithubRepos] = useState<GithubRepoPick[]>([]);
   const [history, setHistory] = useState<ReviewResult[]>([]);
   const [prId, setPrId] = useState("");
   const [review, setReview] = useState<ReviewResult | null>(null);
@@ -90,19 +114,31 @@ export default function HomePage() {
 
   // ---- ui ----
   const [busy, setBusy] = useState("");
+  const [sourceBusy, setSourceBusy] = useState<"" | "azureRepos" | "githubRepos" | "localPicker">("");
   const [showPat, setShowPat] = useState(false);
   const [showApi, setShowApi] = useState(false);
   const [repoFilter, setRepoFilter] = useState("");
+  const [githubRepoFilter, setGithubRepoFilter] = useState("");
   const toast = useToast();
 
   const selectedRepoIds = useMemo(
     () => new Set(settings.azure.selectedRepositories.map((x) => x.repositoryId)),
     [settings.azure.selectedRepositories],
   );
+  const selectedGithubRepoIds = useMemo(
+    () => new Set(settings.github.selectedRepositories.map((x) => x.fullName)),
+    [settings.github.selectedRepositories],
+  );
   const hasPat = Boolean(settings.azure.pat.trim());
-  const hasRepoSelection = settings.azure.selectedRepositories.length > 0;
+  const hasGithubToken = Boolean(settings.github.token?.trim());
+  const hasLocalRepo = settings.local.selectedRepositories.length > 0;
+  const hasRepoSelection =
+    settings.azure.selectedRepositories.length > 0 ||
+    settings.github.selectedRepositories.length > 0 ||
+    hasLocalRepo;
   const hasProvider = settings.providers.some((p) => p.model);
-  const setupComplete = hasPat && hasRepoSelection && hasProvider;
+  const hasSourceCredential = hasPat || hasGithubToken || hasLocalRepo;
+  const setupComplete = hasSourceCredential && hasRepoSelection && hasProvider;
 
   // ---- fetch helpers ----
   async function safeJson<T>(res: Response): Promise<T> {
@@ -165,6 +201,7 @@ export default function HomePage() {
     setHistory([]);
     setReview(null);
     setRepos([]);
+    setGithubRepos([]);
     setPage("dashboard");
   }
 
@@ -173,7 +210,14 @@ export default function HomePage() {
     try {
       const json = await safeJson<ReviewSettings | null>(await fetch("/api/settings"));
       if (json) {
-        setSettings(json);
+        const normalized = {
+          ...json,
+          github: json.github ?? { token: "", selectedRepositories: [] },
+          local: json.local ?? { selectedRepositories: [] },
+        };
+        setSettings(normalized);
+        setRepos(uniqueAzureRepos(normalized.azure.selectedRepositories));
+        setGithubRepos(uniqueGithubRepos(normalized.github.selectedRepositories));
       }
     } catch {
       /* ignore */
@@ -212,7 +256,7 @@ export default function HomePage() {
     } catch (e) {
       toast.error("Save failed", e instanceof Error ? e.message : undefined);
     } finally {
-      setBusy("");
+      setSourceBusy("");
     }
   }
 
@@ -221,7 +265,7 @@ export default function HomePage() {
       toast.error("PAT required", "Add a Personal Access Token first.");
       return;
     }
-    setBusy("Connecting to Azure DevOps...");
+    setSourceBusy("azureRepos");
     try {
       const json = await safeJson<{ repos: RepoPick[] }>(
         await fetch("/api/azure/repos", {
@@ -233,12 +277,97 @@ export default function HomePage() {
           }),
         }),
       );
-      setRepos(json.repos ?? []);
+      setRepos(uniqueAzureRepos([...(json.repos ?? []), ...settings.azure.selectedRepositories]));
       toast.success("Repositories fetched", `Discovered ${json.repos?.length ?? 0} repositories.`);
     } catch (e) {
       toast.error("Repo fetch failed", e instanceof Error ? e.message : undefined);
     } finally {
-      setBusy("");
+      setSourceBusy("");
+    }
+  }
+
+  async function fetchGithubRepos() {
+    if (!settings.github.token?.trim()) {
+      toast.error("GitHub token required", "Add token first.");
+      return;
+    }
+    setSourceBusy("githubRepos");
+    try {
+      const json = await safeJson<{ repos: GithubRepoPick[] }>(
+        await fetch("/api/github/repos", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ token: settings.github.token }),
+        }),
+      );
+      setGithubRepos(uniqueGithubRepos([...(json.repos ?? []), ...settings.github.selectedRepositories]));
+      toast.success("GitHub repositories fetched", `Discovered ${json.repos?.length ?? 0} repositories.`);
+    } catch (e) {
+      toast.error("GitHub fetch failed", e instanceof Error ? e.message : undefined);
+    } finally {
+      setSourceBusy("");
+    }
+  }
+
+  async function addLocalRepository(pathOverride?: string) {
+    const rootPath = (pathOverride ?? "").trim();
+    if (!rootPath) {
+      toast.error("Local path required");
+      return;
+    }
+    try {
+      const json = await safeJson<{ repository: { rootPath: string; name: string } }>(
+        await fetch("/api/local/repos", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ rootPath }),
+        }),
+      );
+      const exists = settings.local.selectedRepositories.some((r) => r.rootPath === json.repository.rootPath);
+      if (exists) {
+        toast.info("Already added", "Repository already in local sources.");
+        return;
+      }
+      setSettings({
+        ...settings,
+        local: {
+          ...settings.local,
+          selectedRepositories: [
+            ...settings.local.selectedRepositories,
+            { rootPath: json.repository.rootPath, name: json.repository.name, defaultBaseBranch: "main" },
+          ],
+        },
+      });
+      toast.success("Local repository added", json.repository.name);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Local repository invalid.";
+      if (message.toLowerCase().includes("not a git repository")) {
+        toast.error("No git repo", "There is no git repo in selected folder.");
+      } else {
+        toast.error("Local repository invalid", message);
+      }
+    }
+  }
+
+  async function pickLocalRepositoryFolder() {
+    setSourceBusy("localPicker");
+    try {
+      const json = await safeJson<{ path?: string; cancelled?: boolean }>(
+        await fetch("/api/local/pick-folder", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+        }),
+      );
+
+      if (json.cancelled || !json.path) {
+        return;
+      }
+
+      await addLocalRepository(json.path);
+    } catch (e) {
+      toast.error("Folder picker failed", e instanceof Error ? e.message : undefined);
+    } finally {
+      setSourceBusy("");
     }
   }
 
@@ -299,14 +428,10 @@ export default function HomePage() {
     }
   }
 
-  async function run(overrideProvider?: ProviderConfig) {
-    if (!prId) {
-      toast.error("PR number required");
-      return;
-    }
+  async function run(target: ReviewTarget, overrideProvider?: ProviderConfig) {
     setBusy("Running review...");
     try {
-      const body: { pullRequestId: number; provider?: ProviderConfig } = { pullRequestId: Number(prId) };
+      const body: { target: ReviewTarget; provider?: ProviderConfig } = { target };
       if (overrideProvider?.model) {
         body.provider = overrideProvider;
       }
@@ -431,14 +556,17 @@ export default function HomePage() {
       const provider = settings.providers.find((p) => p.provider === (providerStr as LlmProvider) && p.model === model);
       if (provider) {
         setPrId(String(item.sources.pullRequestId));
-        run({ provider: provider.provider, apiKey: provider.apiKey, baseUrl: provider.baseUrl, model: provider.model });
+        run(
+          { provider: item.sources.provider, pullRequestId: item.sources.pullRequestId } as ReviewTarget,
+          { provider: provider.provider, apiKey: provider.apiKey, baseUrl: provider.baseUrl, model: provider.model },
+        );
         toast.info("Repeat review", `Re-running with ${PROVIDER_META[provider.provider]?.label ?? provider.provider}/${model}`);
         return;
       }
     }
     // Fallback: use default provider
     setPrId(String(item.sources.pullRequestId));
-    run();
+    run({ provider: item.sources.provider, pullRequestId: item.sources.pullRequestId } as ReviewTarget);
     toast.info("Repeat review", "No provider found in history — using default provider");
   }
 
@@ -450,7 +578,7 @@ export default function HomePage() {
   const activeProvider = settings.providers.find((p) => p.isActive) ?? settings.providers.find((p) => p.model);
   const statusItems = [
     { label: "Azure PAT", ok: hasPat },
-    { label: "Repositories", ok: hasRepoSelection },
+    { label: "Code Sources", ok: hasRepoSelection },
     { label: `AI (${activeProvider ? `${activeProvider.provider}/${activeProvider.model}` : "none"})`, ok: hasProvider },
   ];
 
@@ -495,7 +623,7 @@ export default function HomePage() {
             settings={settings}
             styleProfile={styleProfile}
             onJumpToSettings={(t) => {
-              setSettingsTab(t);
+              setSettingsTab(t === "azure" ? "source" : t);
               setPage("settings");
             }}
             onGoReview={() => setPage("reviews")}
@@ -529,17 +657,24 @@ export default function HomePage() {
             setCandidate={setCandidate}
             models={models}
             repos={repos}
+            githubRepos={githubRepos}
             repoFilter={repoFilter}
             setRepoFilter={setRepoFilter}
+            githubRepoFilter={githubRepoFilter}
+            setGithubRepoFilter={setGithubRepoFilter}
             selectedRepoIds={selectedRepoIds}
+            selectedGithubRepoIds={selectedGithubRepoIds}
             showPat={showPat}
             setShowPat={setShowPat}
             showApi={showApi}
             setShowApi={setShowApi}
             busy={busy}
+            sourceBusy={sourceBusy}
             providerStatus={providerStatus}
             styleProfile={styleProfile}
             onFetchRepos={fetchRepos}
+            onFetchGithubRepos={fetchGithubRepos}
+            onPickLocalRepositoryFolder={pickLocalRepositoryFolder}
             onDetectModels={detectModels}
             onTestConnection={testModelConnection}
             onSaveProvider={saveProvider}
@@ -579,7 +714,7 @@ function DashboardPage({
   history: ReviewResult[];
   settings: ReviewSettings;
   styleProfile: StyleProfile | null;
-  onJumpToSettings: (t: SettingsTab) => void;
+  onJumpToSettings: (t: "azure" | "ai" | "workspace") => void;
   onGoReview: () => void;
   onViewReview: (item: ReviewResult) => void;
 }) {
@@ -778,7 +913,7 @@ function MetricCard({
       </div>
       <div className="metric-value">{value}</div>
       <span className="metric-foot">{foot}</span>
-      {clickable ? <span className="metric-arrow">→</span> : null}
+      {clickable ? <span className="metric-arrow">?</span> : null}
     </div>
   );
 }
@@ -787,6 +922,7 @@ function HistoryRow({ item, onClick }: { item: ReviewResult; onClick?: () => voi
   const date = item.createdAt ? new Date(item.createdAt).toLocaleString() : "";
   const errorCount = item.findings.filter((f) => f.severity === "error").length;
   const warnCount = item.findings.filter((f) => f.severity === "warning").length;
+  const provider = item.sources.provider;
 
   return (
     <button
@@ -815,6 +951,9 @@ function HistoryRow({ item, onClick }: { item: ReviewResult; onClick?: () => voi
         (e.currentTarget as HTMLButtonElement).style.background = "transparent";
       }}
     >
+      <span className="history-source-logo" title={provider}>
+        {provider === "azure" ? <IconAzureLogo width={14} height={14} /> : provider === "github" ? <IconGithubLogo width={14} height={14} /> : <IconRepo width={14} height={14} />}
+      </span>
       <span className="history-pr-id" style={{ fontSize: 12, fontWeight: 600, color: "var(--brand)", whiteSpace: "nowrap" }}>
         #{item.sources.pullRequestId}
       </span>
@@ -879,7 +1018,7 @@ function ReviewsPage({
 }: {
   prId: string;
   setPrId: (s: string) => void;
-  run: (overrideProvider?: ProviderConfig) => void;
+  run: (target: ReviewTarget, overrideProvider?: ProviderConfig) => void;
   busy: string;
   setupComplete: boolean;
   settings: ReviewSettings;
@@ -892,14 +1031,30 @@ function ReviewsPage({
   type SeverityFilter = "all" | "error" | "warning" | "info";
   const [severity, setSeverity] = useState<SeverityFilter>("all");
   const [historyQuery, setHistoryQuery] = useState("");
+  const [historySourceFilter, setHistorySourceFilter] = useState<"all" | "azure" | "github" | "local">("all");
+  const [historyDateFrom, setHistoryDateFrom] = useState("");
+  const [historyDateTo, setHistoryDateTo] = useState("");
+  const [historyPage, setHistoryPage] = useState(1);
   const [prPreview, setPrPreview] = useState<PrPeekResult | null>(null);
   const [peekBusy, setPeekBusy] = useState(false);
   const [peekError, setPeekError] = useState<string | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<string>("");
+  const [sourceKind, setSourceKind] = useState<"azure" | "github" | "local">("azure");
+  const [githubMode, setGithubMode] = useState<"pr" | "branches">("pr");
+  const [azureRepoId, setAzureRepoId] = useState("");
+  const [githubRepoName, setGithubRepoName] = useState("");
+  const [githubSourceBranch, setGithubSourceBranch] = useState("");
+  const [githubTargetBranch, setGithubTargetBranch] = useState("main");
+  const [localSourceBranch, setLocalSourceBranch] = useState("");
+  const [localTargetBranch, setLocalTargetBranch] = useState("main");
+  const [localRepoRoot, setLocalRepoRoot] = useState("");
+  const [localBranches, setLocalBranches] = useState<string[]>([]);
+  const [githubBranches, setGithubBranches] = useState<string[]>([]);
 
   async function peekPr() {
     if (!prId || !settings.azure.pat) return;
-    const repo = settings.azure.selectedRepositories[0];
+    const repo = settings.azure.selectedRepositories.find((r) => r.repositoryId === azureRepoId)
+      ?? settings.azure.selectedRepositories[0];
     if (!repo) return;
     setPeekBusy(true);
     setPeekError(null);
@@ -925,10 +1080,73 @@ function ReviewsPage({
     }
   }
 
+  useEffect(() => {
+    if (!azureRepoId && settings.azure.selectedRepositories[0]) setAzureRepoId(settings.azure.selectedRepositories[0].repositoryId);
+    if (!githubRepoName && settings.github.selectedRepositories[0]) setGithubRepoName(settings.github.selectedRepositories[0].fullName);
+    if (!localRepoRoot && settings.local.selectedRepositories[0]) setLocalRepoRoot(settings.local.selectedRepositories[0].rootPath);
+  }, [settings, azureRepoId, githubRepoName, localRepoRoot]);
+
+  useEffect(() => {
+    async function loadLocalBranches() {
+      if (!localRepoRoot) return;
+      const res = await fetch("/api/local/branches", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ rootPath: localRepoRoot }),
+      });
+      const json = await res.json() as { branches?: string[] };
+      const branches = json.branches ?? [];
+      setLocalBranches(branches);
+      if (!localTargetBranch && branches.includes("main")) setLocalTargetBranch("main");
+    }
+    void loadLocalBranches();
+  }, [localRepoRoot, localTargetBranch]);
+
+  useEffect(() => {
+    async function loadGithubBranches() {
+      if (!githubRepoName || !settings.github.token?.trim()) return;
+      const res = await fetch("/api/github/branches", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: settings.github.token, repoFullName: githubRepoName }),
+      });
+      const json = await res.json() as { branches?: string[] };
+      const branches = json.branches ?? [];
+      setGithubBranches(branches);
+      if (!githubTargetBranch) {
+        if (branches.includes("main")) setGithubTargetBranch("main");
+        else if (branches.includes("master")) setGithubTargetBranch("master");
+      }
+    }
+    void loadGithubBranches();
+  }, [githubRepoName, settings.github.token, githubTargetBranch]);
+
   /** Run review — auto-fetches PR preview first if not already loaded */
   async function handleRun() {
-    if (!prId) return;
-    if (!prPreview && setupComplete) {
+    let target: ReviewTarget;
+    if (sourceKind === "local") {
+      if (!localSourceBranch.trim()) return;
+      target = {
+        provider: "local",
+        sourceBranch: localSourceBranch.trim(),
+        targetBranch: localTargetBranch.trim() || "main",
+        repositoryRoot: localRepoRoot.trim() || undefined,
+      };
+    } else if (sourceKind === "github" && githubMode === "branches") {
+      if (!githubRepoName || !githubSourceBranch.trim() || !githubTargetBranch.trim()) return;
+      target = {
+        provider: "github",
+        repositoryFullName: githubRepoName,
+        sourceBranch: githubSourceBranch.trim(),
+        targetBranch: githubTargetBranch.trim(),
+      };
+    } else {
+      if (!prId) return;
+      target = sourceKind === "github"
+        ? { provider: "github", pullRequestId: Number(prId), repositoryFullName: githubRepoName } as ReviewTarget
+        : { provider: sourceKind, pullRequestId: Number(prId) } as ReviewTarget;
+    }
+    if (sourceKind === "azure" && !prPreview && setupComplete) {
       await peekPr();
     }
     // Build provider override if one is selected
@@ -943,7 +1161,7 @@ function ReviewsPage({
         }
       }
     }
-    run(overrideProvider);
+    run(target, overrideProvider);
   }
 
   const filteredFindings = useMemo(() => {
@@ -958,15 +1176,21 @@ function ReviewsPage({
 
   const filteredHistory = useMemo(() => {
     const q = historyQuery.trim().toLowerCase();
-    if (!q) {
-      return history;
-    }
-    return history.filter(
-      (h) =>
-        h.summary.toLowerCase().includes(q) ||
-        String(h.sources.pullRequestId).includes(q),
-    );
-  }, [history, historyQuery]);
+    return history.filter((h) => {
+      if (historySourceFilter !== "all" && h.sources.provider !== historySourceFilter) return false;
+      if (q && !h.summary.toLowerCase().includes(q) && !String(h.sources.pullRequestId).includes(q)) return false;
+      const created = h.createdAt ? new Date(h.createdAt) : null;
+      if (historyDateFrom && created && created < new Date(`${historyDateFrom}T00:00:00`)) return false;
+      if (historyDateTo && created && created > new Date(`${historyDateTo}T23:59:59`)) return false;
+      return true;
+    });
+  }, [history, historyQuery, historySourceFilter, historyDateFrom, historyDateTo]);
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredHistory.length / pageSize));
+  const pagedHistory = filteredHistory.slice((historyPage - 1) * pageSize, historyPage * pageSize);
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [historyQuery, historySourceFilter, historyDateFrom, historyDateTo]);
 
   function copyAsMarkdown() {
     if (!review) {
@@ -1007,36 +1231,123 @@ function ReviewsPage({
 
         <div className="pr-input-row">
           <div className="field pr-field-wrap">
-            <label className="field-label" htmlFor="pr">Pull Request number</label>
-            <div className="input-group">
-              <input
-                id="pr"
-                className="input pr-number-input"
-                placeholder="e.g. 8421"
-                value={prId}
-                onChange={(e) => { setPrId(e.target.value.replace(/\D/g, "")); setPrPreview(null); setPeekError(null); }}
-                onKeyDown={(e) => { if (e.key === "Enter" && prId) handleRun(); }}
-                inputMode="numeric"
-                style={{ paddingLeft: 40, paddingRight: 52 }}
-                autoComplete="off"
-              />
-              <span style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "var(--text-faint)", pointerEvents: "none" }}>
-                <IconBranch width={14} height={14} />
-              </span>
-              <span className="input-suffix">
-                <button
-                  type="button"
-                  className="input-icon-btn pr-peek-btn"
-                  title="Preview PR details from Azure DevOps"
-                  disabled={!prId || Boolean(busy) || !setupComplete}
-                  onClick={peekPr}
-                  aria-label="Fetch PR preview"
-                >
-                  {peekBusy ? <span className="spinner" style={{ width: 12, height: 12 }} /> : <IconSearch width={13} height={13} />}
-                </button>
-              </span>
-            </div>
+            <label className="field-label" htmlFor="review-source">Source</label>
+            <select id="review-source" className="select" value={sourceKind} onChange={(e) => setSourceKind(e.target.value as "azure" | "github" | "local")}>
+              <option value="azure">Azure DevOps PR</option>
+              <option value="github">GitHub PR</option>
+              <option value="local">Local Branch Compare</option>
+            </select>
           </div>
+        </div>
+
+        <div className="pr-input-row">
+          {sourceKind === "azure" ? (
+            <>
+              <div className="field pr-field-wrap">
+                <label className="field-label" htmlFor="azure-repo">Repository</label>
+                <select id="azure-repo" className="select" value={azureRepoId} onChange={(e) => setAzureRepoId(e.target.value)}>
+                  {settings.azure.selectedRepositories.map((r) => (
+                    <option key={r.repositoryId} value={r.repositoryId}>{r.organization}/{r.project}/{r.repositoryName}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field pr-field-wrap">
+                <label className="field-label" htmlFor="pr">Pull Request number</label>
+                <div className="input-group">
+                  <input
+                    id="pr"
+                    className="input pr-number-input"
+                    placeholder="e.g. 8421"
+                    value={prId}
+                    onChange={(e) => { setPrId(e.target.value.replace(/\D/g, "")); setPrPreview(null); setPeekError(null); }}
+                    onKeyDown={(e) => { if (e.key === "Enter" && prId) handleRun(); }}
+                    inputMode="numeric"
+                    style={{ paddingLeft: 40, paddingRight: 52 }}
+                    autoComplete="off"
+                  />
+                  <span style={{ position: "absolute", left: 13, top: "50%", transform: "translateY(-50%)", color: "var(--text-faint)", pointerEvents: "none" }}>
+                    <IconBranch width={14} height={14} />
+                  </span>
+                  <span className="input-suffix">
+                    <button
+                      type="button"
+                      className="input-icon-btn pr-peek-btn"
+                      title="Preview PR details from Azure DevOps"
+                      disabled={!prId || Boolean(busy) || !setupComplete}
+                      onClick={peekPr}
+                      aria-label="Fetch PR preview"
+                    >
+                      {peekBusy ? <span className="spinner" style={{ width: 12, height: 12 }} /> : <IconSearch width={13} height={13} />}
+                    </button>
+                  </span>
+                </div>
+              </div>
+            </>
+          ) : sourceKind === "github" ? (
+            <>
+              <div className="field pr-field-wrap">
+                <label className="field-label" htmlFor="github-repo">Repository</label>
+                <select id="github-repo" className="select" value={githubRepoName} onChange={(e) => setGithubRepoName(e.target.value)}>
+                  {settings.github.selectedRepositories.map((r) => (
+                    <option key={r.fullName} value={r.fullName}>{r.fullName}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field pr-field-wrap">
+                <label className="field-label" htmlFor="github-mode">Source mode</label>
+                <select id="github-mode" className="select" value={githubMode} onChange={(e) => setGithubMode(e.target.value as "pr" | "branches")}>
+                  <option value="pr">PR number</option>
+                  <option value="branches">Branch compare</option>
+                </select>
+              </div>
+              {githubMode === "pr" ? (
+                <div className="field pr-field-wrap">
+                  <label className="field-label" htmlFor="pr">Pull Request number</label>
+                  <input id="pr" className="input pr-number-input" placeholder="e.g. 8421" value={prId} onChange={(e) => setPrId(e.target.value.replace(/\D/g, ""))} />
+                </div>
+              ) : (
+                <>
+                  <div className="field pr-field-wrap">
+                    <label className="field-label" htmlFor="github-source-branch">Source branch</label>
+                    <select id="github-source-branch" className="select" value={githubSourceBranch} onChange={(e) => setGithubSourceBranch(e.target.value)}>
+                      <option value="">Select source branch</option>
+                      {githubBranches.map((b) => <option key={b} value={b}>{b}</option>)}
+                    </select>
+                  </div>
+                  <div className="field pr-field-wrap">
+                    <label className="field-label" htmlFor="github-target-branch">Target branch</label>
+                    <select id="github-target-branch" className="select" value={githubTargetBranch} onChange={(e) => setGithubTargetBranch(e.target.value)}>
+                      {githubBranches.map((b) => <option key={b} value={b}>{b}</option>)}
+                    </select>
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="field pr-field-wrap">
+                <label className="field-label" htmlFor="local-repo-root">Repository</label>
+                <select id="local-repo-root" className="select" value={localRepoRoot} onChange={(e) => setLocalRepoRoot(e.target.value)}>
+                  {settings.local.selectedRepositories.map((r) => (
+                    <option key={r.rootPath} value={r.rootPath}>{r.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="field pr-field-wrap">
+                <label className="field-label" htmlFor="local-source-branch">Source branch</label>
+                <select id="local-source-branch" className="select" value={localSourceBranch} onChange={(e) => setLocalSourceBranch(e.target.value)}>
+                  <option value="">Select source branch</option>
+                  {localBranches.map((b) => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
+              <div className="field pr-field-wrap">
+                <label className="field-label" htmlFor="local-target-branch">Target branch</label>
+                <select id="local-target-branch" className="select" value={localTargetBranch} onChange={(e) => setLocalTargetBranch(e.target.value)}>
+                  {localBranches.map((b) => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
+            </>
+          )}
           <button
             className="btn btn-primary"
             style={{ alignSelf: "flex-end", flexShrink: 0 }}
@@ -1049,7 +1360,7 @@ function ReviewsPage({
         </div>
 
         {/* Provider/Model selector */}
-        <div className="field" style={{ marginTop: 12 }}>
+        <div className="field review-provider-field" style={{ marginTop: 12 }}>
           <label className="field-label" htmlFor="review-provider">
             AI Provider <span className="muted">(optional — uses default if empty)</span>
           </label>
@@ -1074,7 +1385,7 @@ function ReviewsPage({
               })}
           </select>
           {settings.providers.filter((p) => p.model).length === 0 ? (
-            <span className="field-hint">No providers configured. Go to Settings → AI Providers to add one.</span>
+            <span className="field-hint">No providers configured. Go to Settings ? AI Providers to add one.</span>
           ) : null}
         </div>
 
@@ -1086,7 +1397,7 @@ function ReviewsPage({
           </div>
         ) : null}
 
-        {prPreview ? <PrPreviewCard preview={prPreview} onRunReview={handleRun} runDisabled={!setupComplete || Boolean(busy)} /> : null}
+        {sourceKind === "azure" && prPreview ? <PrPreviewCard preview={prPreview} onRunReview={handleRun} runDisabled={!setupComplete || Boolean(busy)} /> : null}
       </section>
 
       {review ? (
@@ -1191,30 +1502,47 @@ function ReviewsPage({
           </div>
         ) : (
           <>
-            <div className="input-group" style={{ marginBottom: 10 }}>
-              <input
-                className="input"
-                placeholder="Search by PR number or summary..."
-                value={historyQuery}
-                onChange={(e) => setHistoryQuery(e.target.value)}
-                style={{ paddingLeft: 38 }}
-              />
-              <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-faint)" }}>
-                <IconSearch width={15} height={15} />
-              </span>
+            <div className="history-filters">
+              <div className="input-group">
+                <input
+                  className="input"
+                  placeholder="Search by PR number or summary..."
+                  value={historyQuery}
+                  onChange={(e) => setHistoryQuery(e.target.value)}
+                  style={{ paddingLeft: 38 }}
+                />
+                <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-faint)" }}>
+                  <IconSearch width={15} height={15} />
+                </span>
+              </div>
+              <select className="select" value={historySourceFilter} onChange={(e) => setHistorySourceFilter(e.target.value as "all" | "azure" | "github" | "local")}>
+                <option value="all">All sources</option>
+                <option value="azure">Azure</option>
+                <option value="github">GitHub</option>
+                <option value="local">Local</option>
+              </select>
+              <input type="date" className="input" value={historyDateFrom} onChange={(e) => setHistoryDateFrom(e.target.value)} />
+              <input type="date" className="input" value={historyDateTo} onChange={(e) => setHistoryDateTo(e.target.value)} />
             </div>
             {filteredHistory.length === 0 ? (
               <p className="muted" style={{ fontSize: 12.5 }}>No matches.</p>
             ) : (
-              <div className="history-list">
-                {filteredHistory.map((item) => (
+              <>
+                <div className="history-list">
+                {pagedHistory.map((item) => (
                   <HistoryRow
                     key={item.id}
                     item={item}
                     onClick={() => onViewReview(item)}
                   />
                 ))}
-              </div>
+                </div>
+                <div className="history-pagination">
+                  <button className="btn btn-secondary btn-sm" disabled={historyPage <= 1} onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}>Previous</button>
+                  <span className="muted">Page {historyPage} / {totalPages}</span>
+                  <button className="btn btn-secondary btn-sm" disabled={historyPage >= totalPages} onClick={() => setHistoryPage((p) => Math.min(totalPages, p + 1))}>Next</button>
+                </div>
+              </>
             )}
           </>
         )}
@@ -1267,17 +1595,24 @@ function SettingsPage({
   setCandidate,
   models,
   repos,
+  githubRepos,
   repoFilter,
   setRepoFilter,
+  githubRepoFilter,
+  setGithubRepoFilter,
   selectedRepoIds,
+  selectedGithubRepoIds,
   showPat,
   setShowPat,
   showApi,
   setShowApi,
   busy,
+  sourceBusy,
   providerStatus,
   styleProfile,
   onFetchRepos,
+  onFetchGithubRepos,
+  onPickLocalRepositoryFolder,
   onDetectModels,
   onTestConnection,
   onSaveProvider,
@@ -1295,17 +1630,24 @@ function SettingsPage({
   setCandidate: (p: ProviderConfig) => void;
   models: string[];
   repos: RepoPick[];
+  githubRepos: GithubRepoPick[];
   repoFilter: string;
   setRepoFilter: (s: string) => void;
+  githubRepoFilter: string;
+  setGithubRepoFilter: (s: string) => void;
   selectedRepoIds: Set<string>;
+  selectedGithubRepoIds: Set<string>;
   showPat: boolean;
   setShowPat: (b: boolean) => void;
   showApi: boolean;
   setShowApi: (b: boolean) => void;
   busy: string;
+  sourceBusy: "" | "azureRepos" | "githubRepos" | "localPicker";
   providerStatus: Record<string, "ok" | "fail" | "unknown">;
   styleProfile: StyleProfile | null;
   onFetchRepos: () => void;
+  onFetchGithubRepos: () => void;
+  onPickLocalRepositoryFolder: () => Promise<void>;
   onDetectModels: () => void;
   onTestConnection: () => void;
   onSaveProvider: () => Promise<void>;
@@ -1320,11 +1662,11 @@ function SettingsPage({
       <div className="tab-rail" role="tablist">
         <button
           role="tab"
-          aria-selected={tab === "azure"}
-          className={`tab-rail-item ${tab === "azure" ? "active" : ""}`}
-          onClick={() => setTab("azure")}
+          aria-selected={tab === "source"}
+          className={`tab-rail-item ${tab === "source" ? "active" : ""}`}
+          onClick={() => setTab("source")}
         >
-          <IconKey /> Azure DevOps
+          <IconBranch /> Code Sources
         </button>
         <button
           role="tab"
@@ -1344,7 +1686,7 @@ function SettingsPage({
         </button>
       </div>
 
-      {tab === "azure" ? (
+      {tab === "source" ? (
         <AzureTab
           settings={settings}
           setSettings={setSettings}
@@ -1354,8 +1696,14 @@ function SettingsPage({
           repoFilter={repoFilter}
           setRepoFilter={setRepoFilter}
           selectedRepoIds={selectedRepoIds}
-          busy={busy}
+          githubRepos={githubRepos}
+          githubRepoFilter={githubRepoFilter}
+          setGithubRepoFilter={setGithubRepoFilter}
+          selectedGithubRepoIds={selectedGithubRepoIds}
+          sourceBusy={sourceBusy}
           onFetchRepos={onFetchRepos}
+          onFetchGithubRepos={onFetchGithubRepos}
+          onPickLocalRepositoryFolder={onPickLocalRepositoryFolder}
         />
       ) : null}
 
@@ -1406,9 +1754,15 @@ function AzureTab({
   repos,
   repoFilter,
   setRepoFilter,
+  githubRepos,
+  githubRepoFilter,
+  setGithubRepoFilter,
   selectedRepoIds,
-  busy,
+  selectedGithubRepoIds,
+  sourceBusy,
   onFetchRepos,
+  onFetchGithubRepos,
+  onPickLocalRepositoryFolder,
 }: {
   settings: ReviewSettings;
   setSettings: (s: ReviewSettings) => void;
@@ -1417,22 +1771,37 @@ function AzureTab({
   repos: RepoPick[];
   repoFilter: string;
   setRepoFilter: (s: string) => void;
+  githubRepos: GithubRepoPick[];
+  githubRepoFilter: string;
+  setGithubRepoFilter: (s: string) => void;
   selectedRepoIds: Set<string>;
-  busy: string;
+  selectedGithubRepoIds: Set<string>;
+  sourceBusy: "" | "azureRepos" | "githubRepos" | "localPicker";
   onFetchRepos: () => void;
+  onFetchGithubRepos: () => void;
+  onPickLocalRepositoryFolder: () => Promise<void>;
 }) {
+  const effectiveAzureRepos = useMemo(
+    () => uniqueAzureRepos([...settings.azure.selectedRepositories, ...repos]),
+    [repos, settings.azure.selectedRepositories],
+  );
+  const effectiveGithubRepos = useMemo(
+    () => uniqueGithubRepos([...settings.github.selectedRepositories, ...githubRepos]),
+    [githubRepos, settings.github.selectedRepositories],
+  );
+
   const filtered = useMemo(() => {
     const q = repoFilter.trim().toLowerCase();
     if (!q) {
-      return repos;
+      return effectiveAzureRepos;
     }
-    return repos.filter(
+    return effectiveAzureRepos.filter(
       (r) =>
         r.repositoryName.toLowerCase().includes(q) ||
         r.project.toLowerCase().includes(q) ||
         r.organization.toLowerCase().includes(q),
     );
-  }, [repos, repoFilter]);
+  }, [effectiveAzureRepos, repoFilter]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, RepoPick[]>();
@@ -1445,6 +1814,22 @@ function AzureTab({
     return Array.from(map.entries());
   }, [filtered]);
 
+  const filteredGithub = useMemo(() => {
+    const q = githubRepoFilter.trim().toLowerCase();
+    if (!q) return effectiveGithubRepos;
+    return effectiveGithubRepos.filter((r) => r.fullName.toLowerCase().includes(q));
+  }, [effectiveGithubRepos, githubRepoFilter]);
+
+  const groupedGithub = useMemo(() => {
+    const map = new Map<string, GithubRepoPick[]>();
+    for (const r of filteredGithub) {
+      const arr = map.get(r.owner) ?? [];
+      arr.push(r);
+      map.set(r.owner, arr);
+    }
+    return Array.from(map.entries());
+  }, [filteredGithub]);
+
   function toggleRepo(repo: RepoPick, checked: boolean) {
     const next = checked
       ? [...settings.azure.selectedRepositories, repo]
@@ -1455,157 +1840,279 @@ function AzureTab({
     });
   }
 
+  function toggleGithubRepo(repo: GithubRepoPick, checked: boolean) {
+    const next = checked
+      ? [...settings.github.selectedRepositories, repo]
+      : settings.github.selectedRepositories.filter((x) => x.fullName !== repo.fullName);
+    setSettings({
+      ...settings,
+      github: { ...settings.github, selectedRepositories: next },
+    });
+  }
+
+  function removeLocal(rootPath: string) {
+    setSettings({
+      ...settings,
+      local: {
+        ...settings.local,
+        selectedRepositories: settings.local.selectedRepositories.filter((x) => x.rootPath !== rootPath),
+      },
+    });
+  }
+
+
   return (
-    <section className="grid-2" style={{ gridTemplateColumns: "1fr 1.4fr" }}>
+    <section className="col" style={{ gap: 16 }}>
       <article className="card">
         <div className="card-header">
           <div className="card-title-block">
-            <h2>Azure DevOps Access</h2>
-            <span className="card-subtitle">Personal Access Token used to discover orgs and read PRs.</span>
+            <h2>Azure DevOps Source</h2>
+            <span className="card-subtitle">PAT-based source for PR-number reviews with work items context.</span>
           </div>
+          <span className="badge badge-info"><img src="/logos/azure.svg" alt="Azure DevOps" className="source-pill-logo" /> Azure</span>
         </div>
+        <div className="source-split">
+          <div className="source-pane">
+            <div className="form-section">
+              <div className="field">
+                <label className="field-label" htmlFor="pat">Personal Access Token</label>
+                <div className="input-group">
+                  <input
+                    id="pat"
+                    type={showPat ? "text" : "password"}
+                    className="input"
+                    placeholder="Paste your Azure DevOps PAT"
+                    value={settings.azure.pat}
+                    onChange={(e) =>
+                      setSettings({ ...settings, azure: { ...settings.azure, pat: e.target.value } })
+                    }
+                    autoComplete="off"
+                  />
+                  <span className="input-suffix">
+                    <button className="input-icon-btn" onClick={() => setShowPat(!showPat)} aria-label="Toggle PAT visibility" type="button">
+                      {showPat ? <IconEyeOff /> : <IconEye />}
+                    </button>
+                  </span>
+                </div>
+                <span className="field-hint">Required scopes: Code (Read), Work Items (Read), Project &amp; Team (Read).</span>
+              </div>
 
-        <div className="form-section">
-          <div className="field">
-            <label className="field-label" htmlFor="pat">Personal Access Token</label>
-            <div className="input-group">
-              <input
-                id="pat"
-                type={showPat ? "text" : "password"}
-                className="input"
-                placeholder="Paste your Azure DevOps PAT"
-                value={settings.azure.pat}
-                onChange={(e) =>
-                  setSettings({ ...settings, azure: { ...settings.azure, pat: e.target.value } })
-                }
-                autoComplete="off"
-              />
-              <span className="input-suffix">
-                <button
-                  className="input-icon-btn"
-                  onClick={() => setShowPat(!showPat)}
-                  aria-label="Toggle PAT visibility"
-                  type="button"
-                >
-                  {showPat ? <IconEyeOff /> : <IconEye />}
-                </button>
-              </span>
+              <div className="field">
+                <label className="field-label" htmlFor="orgUrl">Organization URL <span style={{ color: "var(--text-faint)", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional)</span></label>
+                <input
+                  id="orgUrl"
+                  type="url"
+                  className="input"
+                  placeholder="https://dev.azure.com/your-org"
+                  value={settings.azure.organizationUrl ?? ""}
+                  onChange={(e) =>
+                    setSettings({ ...settings, azure: { ...settings.azure, organizationUrl: e.target.value } })
+                  }
+                  autoComplete="off"
+                />
+                <span className="field-hint">Fill this in if &quot;Fetch repositories&quot; fails with 401 — bypasses Profile scope requirement.</span>
+              </div>
             </div>
-            <span className="field-hint">
-              Required scopes: Code (Read), Work Items (Read), Project &amp; Team (Read).
-            </span>
+
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border-subtle)" }}>
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <button className="btn btn-primary btn-sm" onClick={onFetchRepos} disabled={sourceBusy === "azureRepos"}>
+                  {sourceBusy === "azureRepos" ? <span className="spinner" /> : <IconRefresh />}
+                  Fetch repositories
+                </button>
+                <a className="btn btn-secondary btn-sm" href="https://learn.microsoft.com/azure/devops/integrate/get-started/authentication/pats" target="_blank" rel="noreferrer">
+                  <IconBook width={13} height={13} /> Create PAT
+                  <IconExternal width={11} height={11} />
+                </a>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, color: "var(--info)", fontWeight: 600 }}>
+                  <IconShield width={10} height={10} /> Stored locally
+                </span>
+                <span style={{ color: "var(--text-faint)", fontSize: 11 }}>·</span>
+                <span style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
+                  {settings.azure.selectedRepositories.length} {settings.azure.selectedRepositories.length === 1 ? "repo" : "repos"} selected
+                </span>
+              </div>
+            </div>
           </div>
 
-          <div className="field">
-            <label className="field-label" htmlFor="orgUrl">Organization URL <span style={{ color: "var(--text-faint)", fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional)</span></label>
-            <input
-              id="orgUrl"
-              type="url"
-              className="input"
-              placeholder="https://dev.azure.com/your-org"
-              value={settings.azure.organizationUrl ?? ""}
-              onChange={(e) =>
-                setSettings({ ...settings, azure: { ...settings.azure, organizationUrl: e.target.value } })
-              }
-              autoComplete="off"
-            />
-            <span className="field-hint">
-              Fill this in if &quot;Fetch repositories&quot; fails with 401 — bypasses Profile scope requirement.
-            </span>
-          </div>
-        </div>
-
-        {/* Divider + action row */}
-        <div style={{ marginTop: 20, paddingTop: 16, borderTop: "1px solid var(--border-subtle)" }}>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <button className="btn btn-primary btn-sm" onClick={onFetchRepos} disabled={Boolean(busy)}>
-              {busy ? <span className="spinner" /> : <IconRefresh />}
-              Fetch repositories
-            </button>
-            <a
-              className="btn btn-secondary btn-sm"
-              href="https://learn.microsoft.com/azure/devops/integrate/get-started/authentication/pats"
-              target="_blank"
-              rel="noreferrer"
-            >
-              <IconBook width={13} height={13} /> Create PAT
-              <IconExternal width={11} height={11} />
-            </a>
-          </div>
-          {/* Status strip — text only, clearly non-interactive */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 10 }}>
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 11.5, color: "var(--info)", fontWeight: 600 }}>
-              <IconShield width={10} height={10} /> Stored locally
-            </span>
-            <span style={{ color: "var(--text-faint)", fontSize: 11 }}>·</span>
-            <span style={{ fontSize: 11.5, color: "var(--text-muted)" }}>
-              {settings.azure.selectedRepositories.length} {settings.azure.selectedRepositories.length === 1 ? "repo" : "repos"} selected
-            </span>
+          <div className="source-pane">
+            <div className="card-title-block" style={{ marginBottom: 10 }}>
+              <h2>Azure Repositories</h2>
+              <span className="card-subtitle">Pick one or more for context and style profiling.</span>
+            </div>
+            <div className="repo-search">
+              <div className="input-group">
+                <input
+                  className="input"
+                  placeholder="Filter by org, project or repo name..."
+                  value={repoFilter}
+                  onChange={(e) => setRepoFilter(e.target.value)}
+                  style={{ paddingLeft: 38 }}
+                />
+                <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-faint)" }}>
+                  <IconSearch width={15} height={15} />
+                </span>
+              </div>
+            </div>
+            {effectiveAzureRepos.length === 0 ? (
+              <div className="empty-state">
+                <span className="empty-state-icon"><IconRepo /></span>
+                <h3>No repositories loaded</h3>
+                <p>Add a PAT and click &quot;Fetch repositories&quot; to discover everything you can access.</p>
+              </div>
+            ) : (
+              <div className="repo-list">
+                {grouped.map(([groupKey, items]) => (
+                  <div key={groupKey} className="repo-group">
+                    <div className="repo-group-head">
+                      <IconBranch width={12} height={12} />
+                      {groupKey}
+                      <span className="muted" style={{ marginLeft: "auto" }}>{items.length}</span>
+                    </div>
+                    {items.map((repo) => {
+                      const checked = selectedRepoIds.has(repo.repositoryId);
+                      return (
+                        <label key={repo.repositoryId} className={`repo-item ${checked ? "checked" : ""}`}>
+                          <input type="checkbox" className="checkbox" checked={checked} onChange={(e) => toggleRepo(repo, e.target.checked)} />
+                          <div className="repo-item-name">
+                            <strong>{repo.repositoryName}</strong>
+                            <small>{repo.organization} / {repo.project}</small>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </article>
 
-      <article className="card">
+      <article className="card source-card source-card-github">
         <div className="card-header">
           <div className="card-title-block">
-            <h2>Repositories</h2>
-            <span className="card-subtitle">Pick one or more for context and style profiling.</span>
+            <h2>GitHub Source</h2>
+            <span className="card-subtitle">Token-based repository discovery and PR-number review.</span>
           </div>
+          <span className="badge badge-info"><img src="/logos/github.png" alt="GitHub" className="source-pill-logo" /> GitHub</span>
         </div>
-
-        <div className="repo-search">
-          <div className="input-group">
-            <input
-              className="input"
-              placeholder="Filter by org, project or repo name..."
-              value={repoFilter}
-              onChange={(e) => setRepoFilter(e.target.value)}
-              style={{ paddingLeft: 38 }}
-            />
-            <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--text-faint)" }}>
-              <IconSearch width={15} height={15} />
-            </span>
-          </div>
-        </div>
-
-        {repos.length === 0 ? (
-          <div className="empty-state">
-            <span className="empty-state-icon">
-              <IconRepo />
-            </span>
-            <h3>No repositories loaded</h3>
-            <p>Add a PAT and click &quot;Fetch repositories&quot; to discover everything you can access.</p>
-          </div>
-        ) : (
-          <div className="repo-list">
-            {grouped.map(([groupKey, items]) => (
-              <div key={groupKey} className="repo-group">
-                <div className="repo-group-head">
-                  <IconBranch width={12} height={12} />
-                  {groupKey}
-                  <span className="muted" style={{ marginLeft: "auto" }}>{items.length}</span>
-                </div>
-                {items.map((repo) => {
-                  const checked = selectedRepoIds.has(repo.repositoryId);
-                  return (
-                    <label key={repo.repositoryId} className={`repo-item ${checked ? "checked" : ""}`}>
-                      <input
-                        type="checkbox"
-                        className="checkbox"
-                        checked={checked}
-                        onChange={(e) => toggleRepo(repo, e.target.checked)}
-                      />
-                      <div className="repo-item-name">
-                        <strong>{repo.repositoryName}</strong>
-                        <small>{repo.organization} / {repo.project}</small>
-                      </div>
-                    </label>
-                  );
-                })}
+        <div className="source-split">
+          <div className="source-pane">
+            <div className="form-section">
+              <div className="field">
+                <label className="field-label" htmlFor="github-token">Token</label>
+                <input
+                  id="github-token"
+                  className="input"
+                  type="password"
+                  value={settings.github.token ?? ""}
+                  placeholder="Fine-grained PAT (repo read + PR read)"
+                  onChange={(e) => setSettings({ ...settings, github: { ...settings.github, token: e.target.value } })}
+                />
               </div>
-            ))}
+              <div className="row" style={{ gap: 8 }}>
+                <button className="btn btn-secondary btn-sm" onClick={onFetchGithubRepos} disabled={sourceBusy === "githubRepos"}>
+                  {sourceBusy === "githubRepos" ? <span className="spinner" /> : <IconRefresh />}
+                  Fetch repositories
+                </button>
+              </div>
+            </div>
           </div>
-        )}
+          <div className="source-pane">
+            <div className="card-title-block" style={{ marginBottom: 10 }}>
+              <h2>GitHub Repositories</h2>
+              <span className="card-subtitle">Pick one or more repositories for PR review context.</span>
+            </div>
+            <div className="repo-search">
+              <input
+                className="input"
+                placeholder="Filter GitHub repositories..."
+                value={githubRepoFilter}
+                onChange={(e) => setGithubRepoFilter(e.target.value)}
+              />
+            </div>
+            {effectiveGithubRepos.length === 0 ? (
+              <div className="empty-state">
+                <span className="empty-state-icon"><IconRepo /></span>
+                <h3>No GitHub repositories loaded</h3>
+                <p>Add token and click &quot;Fetch repositories&quot;.</p>
+              </div>
+            ) : (
+              <div className="repo-list">
+                {groupedGithub.map(([owner, items]) => (
+                  <div key={owner} className="repo-group">
+                    <div className="repo-group-head">
+                      <img src="/logos/github.png" alt="GitHub" className="source-pill-logo" />
+                      {owner}
+                      <span className="muted" style={{ marginLeft: "auto" }}>{items.length}</span>
+                    </div>
+                    {items.map((repo) => {
+                      const checked = selectedGithubRepoIds.has(repo.fullName);
+                      return (
+                        <label key={repo.fullName} className={`repo-item ${checked ? "checked" : ""}`}>
+                          <input type="checkbox" className="checkbox" checked={checked} onChange={(e) => toggleGithubRepo(repo, e.target.checked)} />
+                          <div className="repo-item-name">
+                            <strong>{repo.fullName}</strong>
+                            <small>{repo.owner}</small>
+                          </div>
+                        </label>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </article>
+
+      <article className="card source-card source-card-local">
+        <div className="card-header">
+          <div className="card-title-block">
+            <h2>Local Git Source</h2>
+            <span className="card-subtitle">Branch-vs-branch review from local repositories.</span>
+          </div>
+          <span className="badge badge-success"><img src="/logos/computer.svg" alt="Local computer" className="source-pill-logo" /> Local</span>
+        </div>
+        <div className="source-split">
+          <div className="source-pane">
+            <div className="form-section">
+              <div className="row" style={{ gap: 8 }}>
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={() => { void onPickLocalRepositoryFolder(); }}
+                  disabled={sourceBusy === "localPicker"}
+                  type="button"
+                >
+                  {sourceBusy === "localPicker" ? <span className="spinner" /> : <IconPlus />} Choose repository folder
+                </button>
+              </div>
+              <span className="field-hint">Native folder picker validates selected folder contains a `.git` directory.</span>
+            </div>
+          </div>
+          <div className="source-pane">
+            <div className="card-title-block" style={{ marginBottom: 10 }}>
+              <h2>Local Repositories</h2>
+              <span className="card-subtitle">Repositories available for local branch reviews.</span>
+            </div>
+            <div className="repo-list">
+              {settings.local.selectedRepositories.map((repo) => (
+                <div key={repo.rootPath} className="repo-item checked">
+                  <div className="repo-item-name">
+                    <strong>{repo.name}</strong>
+                    <small>{repo.rootPath}</small>
+                  </div>
+                  <button className="btn btn-danger btn-icon" onClick={() => removeLocal(repo.rootPath)} type="button">
+                    <IconTrash width={14} height={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </article>
     </section>
   );
@@ -1915,6 +2422,10 @@ function WorkspaceTab({
   styleProfile: StyleProfile | null;
   onBuildProfile: () => void;
 }) {
+  const hasAnySourceRepos =
+    settings.azure.selectedRepositories.length > 0 ||
+    settings.github.selectedRepositories.length > 0 ||
+    settings.local.selectedRepositories.length > 0;
   const joined = settings.workspaceRoots.join("\n");
   const [lastJoined, setLastJoined] = useState(joined);
   const [draft, setDraft] = useState(joined);
@@ -2022,13 +2533,13 @@ function WorkspaceTab({
           <button
             className="btn btn-primary"
             onClick={onBuildProfile}
-            disabled={Boolean(busy) || settings.azure.selectedRepositories.length === 0}
+            disabled={Boolean(busy) || !hasAnySourceRepos}
           >
             {busy ? <span className="spinner" /> : <IconSparkles />}
             {styleProfile ? "Refresh profile" : "Build profile"}
           </button>
-          {settings.azure.selectedRepositories.length === 0 ? (
-            <span className="field-hint">Select repositories first on the Azure DevOps tab.</span>
+          {!hasAnySourceRepos ? (
+            <span className="field-hint">Select at least one source repository first on Code Sources tab.</span>
           ) : null}
         </div>
       </article>
@@ -2051,7 +2562,7 @@ function AboutPage() {
               <p className="card-subtitle">Local-first, context-aware AI reviewer for Azure DevOps PRs.</p>
             </div>
           </div>
-          <span className="badge badge-brand">v0.1.7</span>
+          <span className="badge badge-brand">v0.1.8+build.2</span>
         </div>
 
         <p className="text-secondary" style={{ fontSize: 13.5, lineHeight: 1.7 }}>
@@ -2209,7 +2720,7 @@ function PrPreviewCard({
           <div className="pr-preview-section-label">Branch</div>
           <div className="pr-branch-row">
             <span className="pr-branch-name">{preview.sourceBranch}</span>
-            <span className="pr-branch-arrow">→</span>
+            <span className="pr-branch-arrow">?</span>
             <span className="pr-branch-name">{preview.targetBranch}</span>
           </div>
         </div>

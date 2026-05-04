@@ -21,8 +21,29 @@ export type AzureConfig = {
   }>;
 };
 
+export type GithubConfig = {
+  token?: string;
+  selectedRepositories: Array<{
+    owner: string;
+    name: string;
+    fullName: string;
+  }>;
+};
+
+export type LocalRepoConfig = {
+  selectedRepositories: Array<{
+    rootPath: string;
+    name: string;
+    defaultBaseBranch?: string;
+  }>;
+};
+
+export type VcsProvider = "azure" | "github" | "local";
+
 export type ReviewSettings = {
   azure: AzureConfig;
+  github: GithubConfig;
+  local: LocalRepoConfig;
   providers: ProviderConfig[];
   workspaceRoots: string[];
   styleProfilePath?: string;
@@ -44,6 +65,8 @@ export type ReviewResult = {
   createdAt?: string;
   summary: string;
   sources: {
+    provider: VcsProvider;
+    reference: string;
     pullRequestId: number;
     linkedWorkItemIds: number[];
     relatedPullRequestIds: number[];
@@ -60,6 +83,8 @@ export type StoredUser = {
 };
 
 export type PullRequestContext = {
+  provider: VcsProvider;
+  reference: string;
   pullRequestId: number;
   title: string;
   description?: string;
@@ -70,6 +95,12 @@ export type PullRequestContext = {
   changedFiles: Array<{ path: string; patch?: string }>;
   relatedPullRequests: Array<{ id: number; title: string; status?: string }>;
 };
+
+export type ReviewTarget =
+  | { provider: "azure"; pullRequestId: number }
+  | { provider: "github"; pullRequestId: number; repositoryFullName?: string }
+  | { provider: "github"; repositoryFullName: string; sourceBranch: string; targetBranch: string }
+  | { provider: "local"; sourceBranch: string; targetBranch?: string; repositoryRoot?: string };
 
 export type StyleProfile = {
   generatedAt: string;

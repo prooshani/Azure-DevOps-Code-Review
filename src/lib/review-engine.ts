@@ -1,12 +1,14 @@
 import path from "node:path";
 import { fetchPullRequestContext } from "./azure-devops";
+import { fetchGithubBranchCompareContext, fetchGithubPullRequestContext } from "./github";
 import { reviewWithProvider } from "./llm";
+import { fetchLocalBranchContext } from "./local-git";
 import { loadSettings } from "./settings-store";
 import { loadStyleProfile } from "./style-profile";
 import { appendReviewHistory } from "./user-store";
-import type { ProviderConfig, ReviewResult } from "./types";
+import type { ProviderConfig, ReviewResult, ReviewTarget } from "./types";
 
-export async function runReview(userId: string, pullRequestId: number, overrideProvider?: ProviderConfig): Promise<ReviewResult> {
+export async function runReview(userId: string, target: ReviewTarget, overrideProvider?: ProviderConfig): Promise<ReviewResult> {
   const settings = await loadSettings(userId);
   if (!settings) {
     throw new Error("Settings missing. Save settings first.");
@@ -30,7 +32,22 @@ export async function runReview(userId: string, pullRequestId: number, overrideP
     throw new Error("No provider model configured. Please set a default provider in Settings > AI Providers, or select a provider below before running the review.");
   }
 
-  const pr = await fetchPullRequestContext(settings, pullRequestId);
+  const pr =
+    target.provider === "azure"
+      ? await fetchPullRequestContext(settings, target.pullRequestId)
+      : target.provider === "github"
+        ? "pullRequestId" in target
+          ? await fetchGithubPullRequestContext(settings, target.pullRequestId, target.repositoryFullName)
+          : await fetchGithubBranchCompareContext(settings, {
+              repositoryFullName: target.repositoryFullName,
+              sourceBranch: target.sourceBranch,
+              targetBranch: target.targetBranch,
+            })
+        : await fetchLocalBranchContext(settings, {
+            sourceBranch: target.sourceBranch,
+            targetBranch: target.targetBranch,
+            repositoryRoot: target.repositoryRoot,
+          });
   const profilePath = settings.styleProfilePath ?? path.join(process.cwd(), "data", "style-profiles", `${userId}.json`);
   const style = await loadStyleProfile(profilePath);
 
@@ -168,11 +185,13 @@ export async function runReview(userId: string, pullRequestId: number, overrideP
   });
 
   const result: ReviewResult = {
-    id: `${pullRequestId}-${Date.now()}`,
+    id: `${pr.provider}-${pr.reference}-${Date.now()}`,
     createdAt: new Date().toISOString(),
-    summary: `Reviewed PR #${pullRequestId} with ${providerLabel}. Found ${validFindings.length} issue(s).`,
+    summary: `Reviewed ${pr.provider}:${pr.reference} with ${providerLabel}. Found ${validFindings.length} issue(s).`,
     sources: {
-      pullRequestId,
+      provider: pr.provider,
+      reference: pr.reference,
+      pullRequestId: pr.pullRequestId,
       linkedWorkItemIds: pr.linkedWorkItemIds,
       relatedPullRequestIds: pr.relatedPullRequests.map((x) => x.id),
     },
