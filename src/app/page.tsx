@@ -38,8 +38,6 @@ import {
   IconSparkles,
   IconTrash,
   IconX,
-  IconAzureLogo,
-  IconGithubLogo,
 } from "@/components/icons";
 import { SetupWizard } from "@/components/setup-wizard";
 import { ToastStack, useToast } from "@/components/toast";
@@ -951,9 +949,12 @@ function HistoryRow({ item, onClick }: { item: ReviewResult; onClick?: () => voi
         (e.currentTarget as HTMLButtonElement).style.background = "transparent";
       }}
     >
-      <span className="history-source-logo" title={provider}>
-        {provider === "azure" ? <IconAzureLogo width={14} height={14} /> : provider === "github" ? <IconGithubLogo width={14} height={14} /> : <IconRepo width={14} height={14} />}
-      </span>
+      <img
+        className="history-source-logo"
+        src={provider === "azure" ? "/logos/azure.svg" : provider === "github" ? "/logos/github.png" : "/logos/computer.svg"}
+        alt={provider}
+        title={provider}
+      />
       <span className="history-pr-id" style={{ fontSize: 12, fontWeight: 600, color: "var(--brand)", whiteSpace: "nowrap" }}>
         #{item.sources.pullRequestId}
       </span>

@@ -1976,15 +1976,9 @@ code,
   padding: 12px;
 }
 .history-source-logo {
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  border: 1px solid var(--border-soft);
-  background: var(--bg-panel);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-secondary);
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
   flex-shrink: 0;
 }
 .history-filters {
