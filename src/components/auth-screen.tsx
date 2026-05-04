@@ -88,7 +88,7 @@ export function AuthScreen({
           </div>
         </div>
 
-        <div className="auth-brand-foot">© Reviso · MIT License · v0.1.2</div>
+        <div className="auth-brand-foot">© Reviso · MIT License · v0.1.3</div>
        </div>
       </aside>
 
