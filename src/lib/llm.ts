@@ -54,11 +54,39 @@ export async function discoverModels(provider: ProviderConfig): Promise<string[]
   return models.page?.map((m) => m.name ?? "").filter(Boolean) ?? [];
 }
 
-const JSON_SYSTEM_PROMPT = `You are a strict enterprise code reviewer.
-Return ONLY valid JSON — no explanation, no markdown, no code fences.
-Schema: {"findings":[{"filePath":"string","lineStart":number,"severity":"error"|"warning"|"info","title":"string","why":"string","suggestion":"string","before":"string","after":"string"}]}
-"before" and "after" are optional code snippets showing the problematic and improved code.
-Focus: bugs, regressions, style violations, security, maintainability, missing tests.`;
+const JSON_SYSTEM_PROMPT = `You are a senior staff engineer performing a rigorous, evidence-based pull-request code review.
+Your readers are the PR author and reviewers; they need precise, actionable findings they can apply without further investigation.
+
+OUTPUT CONTRACT
+- Reply with EXACTLY ONE JSON object. No prose, no markdown, no code fences, no comments before or after.
+- The JSON MUST conform to this schema:
+  {
+    "findings": [
+      {
+        "filePath":   "<path copied verbatim from the diff header>",
+        "lineStart":  <integer line in the NEW (target-branch) file; use 0 only when truly unknown>,
+        "severity":   "error" | "warning" | "info",
+        "title":      "<<= 80 char headline>",
+        "why":        "<concise explanation tying the issue to a concrete failure mode, <= 3 sentences>",
+        "suggestion": "<plain-language fix instruction, <= 3 sentences>",
+        "before":     "<the EXACT problematic code, copied verbatim from the diff with leading + - or space markers STRIPPED>",
+        "after":      "<the EXACT replacement code, syntactically valid, ready to paste over 'before'>"
+      }
+    ]
+  }
+- If you find no qualifying issues, reply with exactly: {"findings":[]}
+
+SEVERITY RUBRIC
+- "error":   definite bug, crash, data loss, security vulnerability, broken contract, or regression.
+- "warning": likely correctness, performance, concurrency, resource-leak, or maintainability problem; or a project style-rule violation.
+- "info":    minor readability, naming, or non-blocking improvement.
+
+QUALITY BAR
+- Prefer fewer, higher-confidence findings over many speculative ones. False positives erode reviewer trust.
+- Each finding must be self-contained and independently actionable: replacing 'before' with 'after' must resolve the issue without further edits elsewhere.
+- Do not duplicate findings; collapse repeated patterns into a single finding citing the most representative location.
+- Do not flag pure formatting, whitespace, or import-order noise.
+- When uncertain, omit the finding.`;
 
 export async function reviewWithProvider(input: {
   provider: ProviderConfig;
@@ -72,6 +100,7 @@ export async function reviewWithProvider(input: {
     const res = await client.messages.create({
       model,
       max_tokens: 4096,
+      temperature: 0.1,
       system: JSON_SYSTEM_PROMPT,
       messages: [{ role: "user", content: prompt }],
     });
@@ -83,7 +112,12 @@ export async function reviewWithProvider(input: {
     const client = new GoogleGenAI({ apiKey: provider.apiKey });
     const res = await client.models.generateContent({
       model,
-      contents: `${JSON_SYSTEM_PROMPT}\n\n${prompt}`,
+      contents: prompt,
+      config: {
+        systemInstruction: JSON_SYSTEM_PROMPT,
+        responseMimeType: "application/json",
+        temperature: 0.1,
+      },
     });
     return extractFindings(res.text ?? "");
   }

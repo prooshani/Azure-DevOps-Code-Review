@@ -39,105 +39,127 @@ export async function runReview(userId: string, pullRequestId: number, overrideP
     ? pr.linkedWorkItems.map((w) => `  [#${w.id}] ${w.title} (${w.state ?? "Active"})`).join("\n")
     : "  (none)";
   const relatedPRs = pr.relatedPullRequests.length
-    ? pr.relatedPullRequests.map((r) => `  #${r.id} – ${r.title}`).join("\n")
+    ? pr.relatedPullRequests.map((r) => `  #${r.id} - ${r.title}`).join("\n")
     : "  (none)";
   const files = pr.changedFiles.map((f) => `  ${f.path}`).join("\n") || "  (unknown)";
 
-  // Build diff content for each changed file (only files with actual diffs)
+  // Per-file unified diffs. Only include files where Azure DevOps actually returned a patch.
   const filesWithDiffs = pr.changedFiles.filter((f) => f.patch && f.patch.length > 0);
   const diffSections = filesWithDiffs
     .map(
-      (f) => `
-=== DIFF: ${f.path} ===
-${f.patch}
-=== END DIFF: ${f.path} ===`,
+      (f) => `\n=== DIFF: ${f.path} ===\n${f.patch}\n=== END DIFF: ${f.path} ===`,
     )
     .join("\n");
 
   const prompt = [
+    "PULL REQUEST UNDER REVIEW",
+    "=========================",
     `PR #${pr.pullRequestId}: "${pr.title}"`,
-    `Branch: ${pr.sourceBranch ?? "?"} → ${pr.targetBranch ?? "?"}`,
+    `Branch: ${pr.sourceBranch ?? "?"} -> ${pr.targetBranch ?? "?"}`,
+    pr.description ? `\nAuthor's description:\n${pr.description.trim()}` : "",
     "",
-    `Linked work items:\n${workItems}`,
-    `Related PRs:\n${relatedPRs}`,
+    "LINKED WORK ITEMS (the intent of this change)",
+    workItems,
     "",
-    "=== CHANGED FILES ===",
-    "Review ONLY the code shown in the diffs below. DO NOT review, reference, or comment on any code NOT shown.",
-    "DO NOT hallucinate, invent, or assume code that is not explicitly shown in the diff.",
+    "RELATED PULL REQUESTS",
+    relatedPRs,
     "",
-    `${files}`,
-    "=== END CHANGED FILES ===",
+    "PROJECT STYLE RULES (treat violations as at least \"warning\")",
+    styleRules,
     "",
-    diffSections
-      ? `=== ACTUAL DIFFS (REVIEW ONLY THIS CODE) ===\n${diffSections}\n=== END ACTUAL DIFFS ===`
-      : "NOTE: No diff content available.",
+    "FILES CHANGED IN THIS PR",
+    files,
     "",
-    `Project style rules:\n${styleRules}`,
+    "UNIFIED DIFFS",
+    "=============",
+    "These hunks are the ONLY source of truth. Review nothing else; do not infer code outside them.",
+    diffSections || "(no diff content was returned by the server)",
     "",
-    "=== STRICT REVIEW RULES (FOLLOW EXACTLY) ===",
+    "HOW TO READ EACH HUNK",
+    "- Each hunk header has the form:  @@ -<oldStart>,<oldLen> +<newStart>,<newLen> @@",
+    "- `+<newStart>` is the line number, IN THE NEW (target-branch) FILE, where the hunk begins.",
+    "- Lines starting with `+` are ADDED by this PR. Lines starting with `-` are REMOVED. Lines starting with a space are unchanged context.",
+    "- To compute `lineStart`: start a counter at <newStart>; walk the hunk top-down, incrementing the counter for every `+` and ` ` line (NEVER for `-` lines); report the counter value at the FIRST line that contains the issue.",
+    "- Use the file path from the `=== DIFF: <path> ===` banner verbatim as `filePath`.",
     "",
-    "1. SCOPE: Review ONLY the code shown in the diffs above.",
-    "   - If a line is not in the diff, DO NOT mention it.",
-    "   - If a method/class is not shown, DO NOT comment on it.",
-    "   - DO NOT use your training data to guess what code exists.",
+    "WHAT TO LOOK FOR",
+    "Review across ALL of the dimensions below, but only report issues you can anchor to a concrete added or context line in the diff above.",
+    "1.  Correctness & bugs - null/undefined deref, off-by-one, wrong operator, swapped arguments, wrong type, lost return, broken control flow, wrong async/await usage, incorrect equality.",
+    "2.  Security - injection (SQL/HTML/shell/LDAP), deserialization, XSS, SSRF, path traversal, hardcoded secrets, unsafe `eval`/`exec`, broken auth/authz, weak crypto, unsafe randomness, missing input validation at trust boundaries.",
+    "3.  Concurrency & async - data races, missing locks, unawaited promises/tasks, fire-and-forget without error handling, shared mutable state, deadlock risk.",
+    "4.  Resource management - files/streams/handles/connections not closed, missing `using`/`with`/`defer`/`finally`, unbounded retries, memory leaks via captured references.",
+    "5.  Performance - quadratic loops over potentially large inputs, redundant queries, N+1 patterns, sync I/O on hot paths, missing pagination/limits, unnecessary allocations in tight loops.",
+    "6.  API & contract changes - breaking signature changes, removed/renamed public fields, changed enum values, response-shape regressions, changes that silently break existing callers.",
+    "7.  Error handling - swallowed exceptions, generic catches that mask bugs, lost stack traces, error messages leaking internals, missing handling at trust boundaries.",
+    "8.  Tests - assertions that don't actually assert, time/random/network flakiness introduced in this PR, only-happy-path coverage for non-trivial logic added in this PR.",
+    "9.  Maintainability & structure - duplicated logic shipped in this PR, dead code added in this PR, name/intent mismatch, deeply nested branches that obscure correctness, leaky abstractions.",
+    "10. Style-rule violations - any rule from PROJECT STYLE RULES above that this diff breaks.",
+    "11. Intent mismatch - code changes that don't match the linked work item or the PR title/description (e.g. work item says \"fix login bug\" but code touches unrelated billing logic).",
     "",
-    "2. LINE NUMBERS: Use the @@ header in the diff to determine line numbers.",
-    "   - Format: @@ -<start>,<count> +<start>,<count> @@",
-    "   - The first number after '-' is the original file starting line.",
-    "   - Count from that starting line to find the issue.",
-    "   - If you cannot determine the line number, use lineStart: 0.",
+    "WRITING `before` AND `after` (this is the most common source of bad reviews - read carefully)",
+    "- `before`: copy the EXACT problematic code straight from the diff. STRIP the leading `+`, `-`, or space diff marker. Preserve indentation and language. Do not paraphrase.",
+    "- `after`: provide the EXACT replacement code that the author should paste over `before`. It must be syntactically valid in the file's language and must contain NO placeholders like `// ...`, `TODO`, or `<your code here>`.",
+    "- Keep both snippets MINIMAL - usually one expression, statement, or small block. Do not include surrounding unchanged lines.",
+    "- `before` and `after` must be different. If they are equal, omit the finding.",
     "",
-    "3. FINDINGS: Only report issues you can SEE in the diff.",
-    "   - If you cannot see the issue in the diff, DO NOT report it.",
-    "   - DO NOT report missing documentation for methods not shown.",
-    "   - DO NOT report missing error handling for methods not shown.",
-    "   - DO NOT report security issues that require context outside the diff.",
+    "DO NOT REPORT",
+    "- Anything whose existence depends on code NOT shown in the diff.",
+    "- \"Missing documentation/tests/error handling\" for symbols whose body is not visible here.",
+    "- Vague suggestions (\"consider\", \"might want to\", \"could be cleaner\") - if you cannot point to a concrete failure mode, omit it.",
+    "- Pure whitespace, line-ending, or import-ordering noise.",
+    "- Issues you cannot anchor to a specific line that appears in the diff above.",
     "",
-    "4. CODE SNIPPETS: Quote ONLY the exact code shown in the diff.",
-    "   - The 'before' field must match the diff EXACTLY.",
-    "   - The 'after' field must be a reasonable fix for the shown code.",
-    "   - If you cannot provide an accurate snippet, omit the finding.",
+    "EXAMPLE - CORRECT FINDING",
+    "Diff hunk in `src/auth/token.ts`:",
+    "    @@ -22,3 +22,5 @@",
+    "     export function verify(token: string) {",
+    "    +  const decoded = jwt.decode(token);",
+    "    +  return decoded.userId;",
+    "     }",
+    "Output:",
+    "{\"findings\":[{\"filePath\":\"src/auth/token.ts\",\"lineStart\":23,\"severity\":\"error\",\"title\":\"JWT decoded without signature verification\",\"why\":\"`jwt.decode` only parses the token; it does not verify the signature. An attacker can forge any payload, so trusting `decoded.userId` here authenticates arbitrary users.\",\"suggestion\":\"Use `jwt.verify` with the signing secret and pin the algorithm.\",\"before\":\"const decoded = jwt.decode(token);\\nreturn decoded.userId;\",\"after\":\"const decoded = jwt.verify(token, process.env.JWT_SECRET!, { algorithms: ['HS256'] }) as { userId: string };\\nreturn decoded.userId;\"}]}",
     "",
-    "5. FALSE POSITIVES: It is better to miss a finding than to report a false one.",
-    "   - If you are uncertain, DO NOT report it.",
-    "   - If the issue requires context outside the diff, DO NOT report it.",
-    "   - If the code snippet you would quote does not exist, DO NOT report it.",
+    "EXAMPLE - DO NOT REPORT",
+    "Diff hunk in `src/utils/log.ts`:",
+    "    @@ -1,2 +1,3 @@",
+    "     export function log(msg: string) {",
+    "    +  console.log(msg);",
+    "     }",
+    "Do NOT flag \"missing log levels\" or \"should use a logger library\" - that is taste, not a defect.",
     "",
-    "=== EXAMPLE OF CORRECT BEHAVIOR ===",
-    "✓ CORRECT: Diff shows 'if (x) Do();' → Report missing braces",
-    "✗ WRONG: Diff shows 'public void Foo()' → Report missing XML docs (method not fully shown)",
-    "✗ WRONG: Diff shows 'db.Query()' → Report missing try-catch (context outside diff)",
-    "✗ WRONG: Report line 34 when diff only shows lines 12-15",
-    "",
-    "=== OUTPUT FORMAT ===",
-    "Return ONLY valid JSON. No explanation, no markdown, no code fences.",
-    "Schema: {\"findings\":[{\"filePath\":\"string\",\"lineStart\":number,\"severity\":\"error\"|\"warning\"|\"info\",\"title\":\"string\",\"why\":\"string\",\"suggestion\":\"string\",\"before\":\"string\",\"after\":\"string\"}]}",
-    "",
-    "REMEMBER: Only report what you can SEE. If you cannot see it, do not report it.",
-  ]
-    .filter(Boolean)
-    .join("\n");
+    "FINAL OUTPUT",
+    "Return EXACTLY ONE JSON object matching the schema in the system message. No markdown, no code fences, no commentary. If you find no qualifying issues, return: {\"findings\":[]}",
+  ].join("\n");
 
   const findings = await reviewWithProvider({ provider, model: provider.model, prompt });
 
-  // Validate and filter findings - remove those with obviously wrong line numbers
+  // Build a per-file lookup of patch text with diff markers stripped, so we can
+  // reject findings whose `before` quote does not actually appear in the diff.
+  const patchHaystackByPath = new Map<string, string>();
+  for (const f of pr.changedFiles) {
+    if (!f.patch) continue;
+    const stripped = f.patch
+      .split("\n")
+      .filter((l) => !l.startsWith("---") && !l.startsWith("+++") && !l.startsWith("@@"))
+      .map((l) => (l.length > 0 && (l[0] === "+" || l[0] === "-" || l[0] === " ") ? l.slice(1) : l))
+      .join("\n");
+    patchHaystackByPath.set(f.path, normalizeWhitespace(stripped));
+  }
+
   const validFindings = findings.filter((f) => {
-    // Filter out findings with line numbers that are clearly wrong
-    // (line 0 means unknown, which is acceptable, but very high numbers are suspicious)
-    if (f.lineStart < 0 || f.lineStart > 10000) {
-      return false; // Unreasonable line number
+    if (f.lineStart < 0 || f.lineStart > 1_000_000) return false;
+    if (!f.title?.trim() && !f.why?.trim()) return false;
+    // Reject self-trivial fixes where before == after.
+    if (f.before && f.after && normalizeWhitespace(f.before) === normalizeWhitespace(f.after)) {
+      return false;
     }
-    // Filter out findings where the code snippet doesn't match the file path
-    // (this helps catch hallucinated findings)
-    if (f.filePath && f.before) {
-      // Basic validation: if the file path suggests a specific language,
-      // check if the code snippet looks reasonable
-      const ext = f.filePath.split(".").pop()?.toLowerCase();
-      if (ext === "cs" || ext === "cshtml") {
-        // C# files should have C#-like code
-        const hasCSharpKeywords = /\b(if|else|for|while|class|public|private|void|return|new|this|base)\b/i.test(f.before);
-        if (!hasCSharpKeywords && f.before.length > 10) {
-          // Might be a hallucinated finding
+    // Anti-hallucination: if we have the file's diff and `before` is non-trivial,
+    // require that `before` actually appears (whitespace-insensitive) in the diff.
+    if (f.before && f.filePath) {
+      const haystack = patchHaystackByPath.get(f.filePath);
+      if (haystack) {
+        const needle = normalizeWhitespace(f.before);
+        if (needle.length > 8 && !haystack.includes(needle)) {
           return false;
         }
       }
@@ -159,4 +181,8 @@ ${f.patch}
 
   await appendReviewHistory(userId, result);
   return result;
+}
+
+function normalizeWhitespace(s: string): string {
+  return s.replace(/\s+/g, " ").trim();
 }

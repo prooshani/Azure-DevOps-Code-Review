@@ -7,7 +7,6 @@ import {
   IconEye,
   IconEyeOff,
   IconLock,
-  IconLogo,
   IconMail,
   IconShield,
   IconUser,
@@ -41,11 +40,9 @@ export function AuthScreen({
       <aside className="auth-brand-side">
        <div className="auth-brand-content">
         <div className="auth-brand-top">
-          <div className="brand-mark">
-            <IconLogo />
-          </div>
+          <img src="/reviso-icon.png" alt="Reviso" className="brand-logo" />
           <div className="auth-brand-top-text">
-            ADO Review AI
+            Reviso
             <small>Context-aware reviewer</small>
           </div>
         </div>
@@ -91,16 +88,14 @@ export function AuthScreen({
           </div>
         </div>
 
-        <div className="auth-brand-foot">Â© ADO Review AI Â· MIT License Â· v0.1.1</div>
+        <div className="auth-brand-foot">© Reviso · MIT License · v0.1.2</div>
        </div>
       </aside>
 
       <section className="auth-form-side">
         <form className="auth-card" onSubmit={submit}>
           <div className="row" style={{ alignItems: "center", gap: 10, marginBottom: 4 }}>
-            <div className="brand-mark" aria-hidden>
-              <IconLogo />
-            </div>
+            <img src="/reviso-icon.png" alt="" aria-hidden className="brand-logo" />
             <div>
               <h1>{mode === "login" ? "Welcome back" : "Create your profile"}</h1>
               <p className="auth-sub">

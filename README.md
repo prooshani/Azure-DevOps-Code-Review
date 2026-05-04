@@ -1,8 +1,8 @@
-# Azure DevOps Code Review AI
+# Reviso
 
 ![Project Header](./public/github-header.svg)
 
-Enterprise-grade, context-aware AI reviewer for Azure DevOps pull requests. Tool reads PR diff, linked work items, related PR history, and repository coding practices, then produces actionable review findings in diff-style format.
+Reviso is an enterprise-grade, context-aware AI reviewer for Azure DevOps pull requests. Tool reads PR diff, linked work items, related PR history, and repository coding practices, then produces actionable review findings in diff-style format.
 
 ## Why This Project
 
@@ -87,8 +87,8 @@ Needed to create PR threads/comments from this app.
 
 ## Branding Assets
 
-- Logo: `public/logo.svg`
-- App icon: `src/app/icon.svg`
+- Logo: `public/reviso-icon.png`
+- App icon / favicon: `src/app/icon.png`
 - GitHub header: `public/github-header.svg`
 
 ## License

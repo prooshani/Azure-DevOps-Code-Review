@@ -17,11 +17,11 @@ const jetMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Azure DevOps Code Review AI",
+  title: "Reviso",
   description:
     "Context-aware AI code reviewer for Azure DevOps. Understands your team's style, ingests work-item context, and produces diff-style findings.",
-  applicationName: "ADO Review AI",
-  authors: [{ name: "ADO Review AI" }],
+  applicationName: "Reviso",
+  authors: [{ name: "Reviso" }],
 };
 
 export const viewport: Viewport = {

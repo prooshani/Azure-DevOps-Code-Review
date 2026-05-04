@@ -2045,19 +2045,17 @@ function AboutPage() {
       <section className="card card-glow">
         <div className="card-header">
           <div className="row" style={{ gap: 14 }}>
-            <div className="brand-mark brand-mark-lg">
-              <IconReview />
-            </div>
+            <img src="/reviso-icon.png" alt="Reviso" className="brand-logo brand-logo-lg" />
             <div className="card-title-block">
-              <h1 style={{ fontSize: 22 }}>ADO Review AI</h1>
+              <h1 style={{ fontSize: 22 }}>Reviso</h1>
               <p className="card-subtitle">Local-first, context-aware AI reviewer for Azure DevOps PRs.</p>
             </div>
           </div>
-          <span className="badge badge-brand">v0.1.1</span>
+          <span className="badge badge-brand">v0.1.2</span>
         </div>
 
         <p className="text-secondary" style={{ fontSize: 13.5, lineHeight: 1.7 }}>
-          ADO Review AI ingests PR diffs, linked work items and related history, then audits changes against your team
+          Reviso ingests PR diffs, linked work items and related history, then audits changes against your team
           coding conventions. Run it locally or as a Docker container. Bring your own keys for OpenAI, Anthropic,
           Gemini, or run fully offline with Ollama or LM Studio.
         </p>
@@ -2083,7 +2081,7 @@ function AboutPage() {
         <div className="card-header">
           <div className="card-title-block">
             <h2>Update channel</h2>
-            <span className="card-subtitle">Track new releases of ADO Review AI.</span>
+            <span className="card-subtitle">Track new releases of Reviso.</span>
           </div>
           <span className="badge badge-success"><IconCheck width={11} height={11} /> Up to date</span>
         </div>

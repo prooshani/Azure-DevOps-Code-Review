@@ -6,7 +6,6 @@ import {
   IconHelp,
   IconHome,
   IconInfo,
-  IconLogo,
   IconLogout,
   IconMenu,
   IconReview,
@@ -59,12 +58,10 @@ export function AppShell({
       {navOpen ? <div className="sidebar-backdrop" onClick={() => setNavOpen(false)} /> : null}
       <aside className={`sidebar ${navOpen ? "open" : ""}`}>
         <div className="sidebar-brand">
-          <div className="brand-mark">
-            <IconLogo />
-          </div>
+          <img src="/reviso-icon.png" alt="Reviso" className="brand-logo" />
           <div className="sidebar-brand-text">
-            <strong>ADO Review AI</strong>
-            <small>v0.1.1</small>
+            <strong>Reviso</strong>
+            <small>v0.1.2</small>
           </div>
         </div>
 

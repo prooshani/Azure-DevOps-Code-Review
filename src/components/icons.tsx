@@ -22,13 +22,6 @@ export function Icon({ children, ...props }: IconProps & { children: React.React
   );
 }
 
-export const IconLogo = (p: IconProps) => (
-  <svg width={22} height={22} viewBox="0 0 24 24" fill="none" aria-hidden {...p}>
-    <path d="M5 12L10 17L19 7" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-    <circle cx="19.5" cy="6.5" r="1.6" fill="currentColor" />
-  </svg>
-);
-
 export const IconHome = (p: IconProps) => (
   <Icon {...p}>
     <path d="M3 11l9-8 9 8v9a2 2 0 0 1-2 2h-4v-7H9v7H5a2 2 0 0 1-2-2v-9z" />
